@@ -1,0 +1,14 @@
+<Project Sdk="Godot.NET.Sdk/4.7.0">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Game.Core/Game.Core.csproj" />
+    <GameData Include="../../data/**/*.json" />
+  </ItemGroup>
+  <Target Name="CopyGameData" BeforeTargets="BeforeBuild">
+    <Copy SourceFiles="@(GameData)" DestinationFiles="@(GameData->'$(MSBuildProjectDirectory)/data/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

@@ -1,0 +1,132 @@
+# Mini Car Mayhem 3D — Refinement & Progression Evolution
+
+Jesteś Principal Game Engineer, Game Designer i Network Architect.
+Pracujesz na ISTNIEJĄCYM, działającym repozytorium **Mini Car Mayhem 3D** (Godot 4.7 .NET, Jolt Physics 3D, C#, ENet UDP, SDK .NET 10).
+
+Gra posiada już działający rdzeń: wyścigi 3D (samochód Rook w 8 kolorach, 1 tor, do 8 aut), niezależne celowanie wieżyczką (kursor myszy / prawa gałka pada), drift (Spacja / A), 4 bronie (karabin, laser z chłodzeniem <30%, rakiety, miny), boty AI, multiplayer w modelu Host-Authoritative (Listen Server oraz tryb `--dedicated`), polskie UI oraz rozbudowany zestaw skryptów weryfikacyjnych (`build.ps1`, `test.ps1`, `integration.ps1 -Impaired -Combat`, `connection-tests.ps1` oraz szybki tryb `--smoke`).
+
+Twoim zadaniem jest przekształcenie tego prototypu w kompletną grę wyścigowo-bojową z:
+1. Dopracowanym modelem jazdy 3D, celowania wieżyczką, wygładzaniem korekt sieciowych i feedbackiem walki (P0).
+2. Rozbudową broni na poziomy 1–5 oraz deterministycznym potokiem wyliczania statystyk w `Game.Core` (P1).
+3. Zaawansowanym drzewkiem umiejętności (DAG) w 5 specjalizacjach i ekranem Garażu (P1).
+4. Trwałą progresją Local-First (`user://profile.json`) połączoną z autorytatywną walidacją buildów po stronie Hosta (`BuildValidator` + limity budżetu pokoju), bez konieczności utrzymywania zewnętrznej bazy danych (P1).
+
+## Złote zasady pracy na tym repozytorium (CRITICAL)
+1. **Nie pisz gry od nowa i nie psuj istniejących skryptów:** Wszystkie skrypty w `./scripts/` (`build.ps1`, `test.ps1`, `integration.ps1`, `connection-tests.ps1`) oraz flagi CLI (`--host`, `--dedicated`, `--autostart`, `--smoke`, `--bots`, `--results`, `--screenshot`, `--no-weapons`, `--weapon`, `--rounds`) MUSZĄ zachować pełną kompatybilność wsteczną.
+2. **Zachowaj architekturę bez zewnętrznego backendu:** Gra musi działać od ręki po uruchomieniu pliku wykonywalnego w modelu Host-P2P oraz Dedicated Headless. Nie wprowadzaj zależności od zewnętrznego serwera PostgreSQL ani ASP.NET Core do działania podstawowej gry i progresji.
+3. **Separacja `Game.Core` i `Game.Client`:** Cała logika statystyk, drzewka DAG, walidacji buildów, ekonomii, nagród i reguł wyścigu musi znajdować się w `src/Game.Core` (czysty .NET bez zależności od Godota) i być pokryta testami xUnit w `tests/Game.Core.Tests`.
+4. **Spójność językowa UI:** Zachowaj polskie nazewnictwo w interfejsie użytkownika (`src/Game.Client`), spójne z obecnym menu i HUD-em.
+
+---
+
+## Etap 1: Audyt kodu i Refinement P0 (Jazda, Wieżyczka, Kamera, Netcode Smoothing, Combat Feel)
+
+### 1.1. Audyt (`docs/refinement-audit.md`)
+Przeanalizuj dokładnie `README.md`, `docs/architecture.md`, `docs/networking-p2p.md`, `docs/verification.md` oraz kod w `src/Game.Core`, `src/Game.Client`, `data/` i `tests/`.
+Zapisz w `docs/refinement-audit.md` krótki, konkretny raport:
+- Jak obecnie współpracuje przybliżony model predykcji w `Game.Core` z fizyką Jolt w `Game.Client`.
+- Jak serializowane są pakiety ENet i jak działa walidacja buildów w `Game.Core`.
+- Plan bezinwazyjnego wpięcia poziomów broni (1–5), drzewka DAG, Garażu i zapisu profilu.
+
+### 1.2. Refinement jazdy 3D, kamery i celowania wieżyczką
+- Dopracuj model jazdy arcade i driftu (Spacja / A): wejście w kontrolowany poślizg musi być czytelne, przewidywalne i pozwalać na utrzymanie pędu w zakręcie.
+- Dopracuj celowanie wieżyczką (kursor / prawa gałka): dodaj konfigurowalną prędkość obrotu wieżyczki (`TurretTraverseSpeed`) oraz wyraźny wskaźnik linii celowania / zasięgu na torze.
+- Ulepsz kamerę 3D (zachowując stałą orientację świata!): dodaj płynny *camera look-ahead* zależny od wektora prędkości samochodu oraz delikatnego przesunięcia w kierunku celowania wieżyczki, bez szarpania przy kolizjach i respawnie.
+
+### 1.3. Predykcja, Jolt Reconciliation i Visual Smoothing
+- Zsynchronizuj stałe kinematyczne modelu predykcji w `Game.Core` z siłami aplikowanymi do Jolt 3D w `Game.Client`.
+- Wprowadź rozdział pozycji fizycznej od reprezentacji wizualnej pojazdu (`VisualSmoothingOffset`):
+  - Gdy klient otrzymuje autorytatywny snapshot od Hosta i następuje korekta pozycji po reconciliation, małe i średnie korekty (np. poniżej 3,5 m) nie mogą powodować widocznego przeskoku modelu 3D – błąd wizualny ma być wygaszany płynnie (exponential decay w czasie 80–120 ms).
+  - Przy respawnie lub dużej rozbieżności (teleportacji) natychmiast zeruj offset wizualny i bufor interpolacji.
+- Dodaj zbieranie metryk diagnostycznych sieci (RTT, jitter, średni i maksymalny dystans korekcji predykcji, wiek snapshotu) i uwzględnij je w raportach JSON generowanych przez testy integracyjne.
+
+### 1.4. Combat Feedback
+- Oddziel autorytatywną symulację obrażeń od warstwy prezentacji.
+- Dodaj czytelny feedback trafień: *hit markers* przy celowniku, opcjonalne liczby obrażeń, iskry/cząsteczki w punkcie trafienia, wyraźny efekt przegrzania lasera (oraz sygnał zejścia poniżej progu 30%), dym/płomienie zależne od % HP oraz subtelny lokalny *screen shake* przy eksplozjach rakiet i min.
+
+---
+
+## Etap 2: Data-Driven Stat Pipeline i Poziomy Uzbrojenia (1–5)
+
+### 2.1. Rozbudowa definicji danych (`data/weapons/`, `data/cars/`)
+Rozszerz pliki JSON w `data/` tak, aby każda z 4 broni (Machine Gun, Laser, Rocket Launcher, Mines) posiadała jawnie zdefiniowane poziomy ulepszeń **1 do 5**, a samochód Rook (oraz przyszłe warianty podwozia) posiadał kompletny profil parametrów bazowych.
+Poziomy broni 1–5 mają modyfikować nie tylko parametry liczbowe (obrażenia, szybkostrzelność, zapas amunicji, zużycie energii, tempo chłodzenia, promień wybuchu, siłę odrzutu fizycznego), ale także odblokowywać **cechy specjalne (`WeaponPerkFlags`)** na wyższych poziomach, np.:
+- **Karabin (poz. 4–5):** przebijanie osłon / mniejszy rozrzut w ruchu / dodatkowy zapas amunicji.
+- **Laser (poz. 4–5):** obniżenie progu odblokowania po przegrzaniu, zwiększony zasięg lub przebijanie pierwszego celu.
+- **Rakiety (poz. 4–5):** zwiększony impuls odrzucający (`KnockbackImpulse`) lub krótka salwa dwupociskowa.
+- **Miny (poz. 4–5):** szybsze uzbrajanie, większy limit aktywnych min na torze lub pole spowalniające (EMP/Slow) po wybuchu.
+
+### 2.2. Deterministyczny `VehicleStatCalculator` w `Game.Core`
+Zaimplementuj w `Game.Core` czysty, w pełni testowalny pipeline wyliczania statystyk:
+`BaseVehicleStats` → `WeaponLevelStats (1..5)` → `SkillTreeModifiers (Add / Multiply / Override / MechanicsFlags)` → `ClampedFinalStats`.
+Zdefiniuj twarde limity minimalne i maksymalne (caps) dla wszystkich kluczowych statystyk, aby żadna kombinacja mnożników nie mogła zepsuć fizyki Jolt ani zablokować odnowienia broni.
+
+---
+
+## Etap 3: Drzewko Umiejętności (DAG) i Autorytatywny `BuildValidator` P2P
+
+### 3.1. Silnik DAG i 5 Specjalizacji (`data/skills/`)
+Zaprojektuj w `Game.Core` i `data/skills/` skierowany graf acykliczny (DAG) umiejętności podzielony na **5 specjalizacji** (minimum 6 węzłów na gałąź, łącznie min. 30 węzłów):
+1. **Napęd (Drive):** przyspieszenie, prędkość maksymalna, kontrola driftu, impuls prędkości po wyjściu z długiego driftu (`DriftBoost`), przyczepność i masa taranująca.
+2. **Balistyka i Wieżyczka (Ballistics):** prędkość obrotu wieżyczki (`TurretTraverseSpeed`), szybkostrzelność, pojemność magazynka karabinu/rakiet, prędkość pocisków, odzyskiwanie części amunicji na checkpointach.
+3. **Energia i Termika (Energy):** redukcja kosztu energii lasera, szybsze chłodzenie, obniżenie progu blokady przegrzania, **Radiatory Driftowe** (szybsze chłodzenie lasera podczas driftu).
+4. **Obrona (Defense):** maksymalne HP, pancerz (redukcja obrażeń), odporność na odrzut fizyczny od wybuchów, wzmocnienie ochrony po respawnie, pasywna regeneracja poza walką.
+5. **Sabotaż (Sabotage):** obrażenia i zasięg min, limit jednoczesnych min, efekt spowolnienia/zakłócenia obrotu wieżyczki trafionego wroga, zrzut awaryjnej miny przy zniszczeniu auta.
+
+Wymagania modelu DAG:
+- Każdy węzeł ma `Id`, `Name`, `Description`, `Branch`, `Position`, `MaxRank` (zwykle 3 lub 5, 1 dla węzłów kluczowych/Keystone), `RankCosts`, `Prerequisites` (np. `NodeId` + `MinRank`), opcjonalne wykluczenia (`ExclusiveGroup`), `RequiredPlayerLevel` oraz jawne `RankEffects` dla każdego poziomu.
+- Walidator grafu sprawdza przy starcie brak cykli, poprawność ID oraz spójność kosztów.
+
+### 3.2. Walidacja Buildów na Hoście i Tryby Balansu w Lobby (`BuildValidator`)
+- Klient nigdy nie wysyła swoich obliczonych statystyk jako autorytatywnych. Klient przesyła do Hosta `LoadoutDeclaration` (wybrany samochód, kolor, broń główną i jej poziom 1–5, poziom min 1–5, słownik `NodeId -> Rank` z drzewka umiejętności).
+- Host weryfikuje `LoadoutDeclaration` za pomocą `BuildValidator` w `Game.Core` i sam oblicza statystyki auta klienta.
+- Dodaj w Lobby opcję wybieraną przez Hosta — **Reguły Balansu Pokoju (`LobbyBalanceMode`)**:
+  1. `Stock` (wszystkie bronie poz. 1, 0 SP – czysty wyścig zręcznościowy).
+  2. `FairCap` (domyślny tryb sieciowy: narzucony przez Hosta budżet, np. maks. 15 SP i maks. poziom broni 3; jeśli gracz ma wyższy poziom, jego statystyki/poziomy są respektowane do limitu pokoju).
+  3. `OpenMayhem` (pełny limit progresji, np. do 30 SP i broń poz. 5).
+- Dodaj testy jednostkowe i integracyjne sprawdzające, że Host odrzuca lub koryguje sfałszowane pakiety `LoadoutDeclaration` (np. ujemne rangi, przekroczone `MaxRank`, brak spełnionych `Prerequisites`, przekroczony budżet SP).
+
+---
+
+## Etap 4: Garaż, Interaktywne UI Drzewka Umiejętności i Trwała Progresja Lokalna
+
+### 4.1. Ekran Garażu i Ekonomia (`XP`, `Credits`, `SkillPoints`)
+- Rozdziel trzy waluty w `PlayerProfile`:
+  - **XP i Poziom Gracza:** zdobywane za ukończenie wyścigu, pozycję na podium i trafienia/zniszczenia; każdy poziom przyznaje **Skill Points (SP)**.
+  - **Kredyty (Credits):** zdobywane w wyścigach; służą do odblokowywania i ulepszania broni oraz min na poziomy 1–5.
+  - **Punkty Umiejętności (SP):** służą wyłącznie do rozwijania węzłów w drzewku DAG.
+- Zaimplementuj trwały zapis profilu w `user://profile.json` z wersjonowaniem schematu, walidacją przy odczycie oraz zabezpieczeniem przed duplikacją nagród za ten sam identyfikator ukończonego wyścigu (`RaceSessionId`).
+- Dodaj w Garażu możliwość zapisania i szybkiego przełączania co najmniej **3 presetów (Loadoutów)**, dostępnych również bezpośrednio na ekranie Lobby przed kliknięciem „Gotowy”.
+
+### 4.2. Interaktywny Edytor Drzewka Umiejętności (Skill Tree UI)
+Stwórz czytelny, responsywny ekran Drzewka Umiejętności renderowany dynamicznie z danych JSON (bez zaszywania węzłów na sztywno w scenie):
+- Obsługa przesuwania (pan) i przybliżania (zoom) widoku grafu.
+- Rysowanie linii zależności między węzłami z kolorami odzwierciedlającymi stan (zablokowany, dostępny, częściowo rozwinięty, maksymalny, wykluczony).
+- Panel szczegółów węzła (obecny poziom `0/N`, koszt kolejnego poziomu w SP, dokładny opis efektu obecnego i kolejnego poziomu, wymagania wstępne).
+- Prawy panel **Podglądu Statystyk na Żywo**, który natychmiast pokazuje zmiany parametrów Rooka i wybranej broni po dodaniu punktu.
+- Przycisk **Resetuj punkty (Respec)** z potwierdzeniem.
+
+---
+
+## Etap 5: Usprawnienia P2P i Narzędzie Weryfikacji Balansu
+
+1. **Ułatwienia połączenia P2P:**
+   - Zachowaj łączenie po IP i porcie (domyślnie 28747/UDP).
+   - Dodaj opcjonalną, nieblokującą obsługę `UPNP` po stronie Hosta (z czytelnym statusem w Lobby: np. „Port UDP otwarty (UPnP)” / „Tryb LAN lub ręczne przekierowanie portu”).
+   - Dodaj przycisk kopiowania i wklejania **Kodu Połączenia** (kompaktowy ciąg kodujący IP:Port) ze schowka systemowego.
+2. **Symulacja i balans buildów (`--smoke` / testy):**
+   - Pozwól botom AI w trybie solo, multiplayer i `--smoke` korzystać z predefiniowanych archetypów buildów (np. *Speedster*, *Laser Cooling*, *Rocket Bruiser*, *Mine Saboteur*, *Tank*).
+   - Zaktualizuj dokumentację (`README.md`, `docs/architecture.md`, `docs/networking-p2p.md`, `docs/verification.md`).
+
+---
+
+## Sposób realizacji i weryfikacji
+Pracuj iteracyjnie etap po etapie (Etap 1 → Etap 2 → Etap 3 → Etap 4 → Etap 5).
+Po KAŻDYM etapie obowiązkowo uruchom i potwierdzaj wynik:
+1. `./scripts/build.ps1`
+2. `./scripts/test.ps1`
+3. `./scripts/integration.ps1 -Impaired -Combat`
+4. `./scripts/connection-tests.ps1`
+5. Szybki test headless `--fixed-fps 60 -- --smoke --bots=7`
+
+Zacznij od przeprowadzenia audytu repozytorium, utworzenia `docs/refinement-audit.md` i realizacji **Etapu 1**.

@@ -1,0 +1,31 @@
+config_version=5
+
+[application]
+config/name="Mini Car Mayhem 3D"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.7", "C#", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[dotnet]
+project/assembly_name="Game.Client"
+
+[display]
+window/size/viewport_width=1440
+window/size/viewport_height=900
+window/size/window_width_override=1280
+window/size/window_height_override=800
+window/stretch/mode="canvas_items"
+
+[physics]
+common/physics_ticks_per_second=60
+3d/physics_engine="Jolt Physics"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.045, 0.065, 0.1, 1)
+
+[layer_names]
+3d_physics/layer_1="Track"
+3d_physics/layer_2="Cars"

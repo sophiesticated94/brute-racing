@@ -1,0 +1,29 @@
++-------------------------------------------------------------------+
+| GRACZ 1 - GOSPODARZ (HOST / LISTEN SERVER - PeerId: 1)            |
+|                                                                   |
+|  [ Lokalny Klient 3D ] <---> [ Wbudowany Serwer Autorytatywny ]   |
+|  - Kamera 3D, UI, Efekty     - Fizyka Jolt 3D (60 Hz)             |
+|  - Sterowanie lokalne        - Walidacja buildów graczy           |
+|                              - Obrażenia, kolizje, checkpointy    |
+|                              - Przyznawanie nagród po wyścigu     |
++-------------------------------------------------------------------+
+                 ^                               ^
+                 | UDP / P2P (ENet / Relay)      | UDP / P2P (ENet / Relay)
+                 | (Komendy sterowania 60Hz)     | (Snapshoty świata 20-30Hz)
+                 v                               v
++---------------------------------+   +---------------------------------+
+| GRACZ 2 - KLIENT (PeerId: X)    |   | GRACZ 3..8 - KLIENCI            |
+| - Renderowanie 3D               |   | - Renderowanie 3D               |
+| - Client-side prediction        |   | - Client-side prediction        |
+| - Interpolacja innych aut       |   | - Interpolacja innych aut       |
+| - Lokalny profil i garaż        |   | - Lokalny profil i garaż        |
++---------------------------------+   +---------------------------------+
+                 \                               /
+                  \--- HTTPS / Kod Pokoju ------/
+                                 v
+            +-----------------------------------------+
+            | Lekki Serwis Matchmakingu / Relay       |
+            | (ASP.NET Core 10 lub Steam Lobbies)     |
+            | - Rejestracja kodów pokoi (np. "M4Y8")  |
+            | - Pomoc w zestawieniu połączenia P2P    |
+            +-----------------------------------------+

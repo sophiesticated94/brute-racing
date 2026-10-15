@@ -1,0 +1,6 @@
+[
+  {"id":"machine_gun","name":"Karabin","damage":7,"fireRate":9,"range":43,"projectileSpeed":0,"splashRadius":0,"knockbackForce":350,"ammoCapacity":180,"energyConsumption":0,"heatGeneration":0},
+  {"id":"laser","name":"Laser","damage":13,"fireRate":5,"range":48,"projectileSpeed":0,"splashRadius":0,"knockbackForce":150,"ammoCapacity":0,"energyConsumption":12,"heatGeneration":16},
+  {"id":"rocket","name":"Rakiety","damage":42,"fireRate":0.9,"range":60,"projectileSpeed":38,"splashRadius":6,"knockbackForce":8500,"ammoCapacity":18,"energyConsumption":0,"heatGeneration":0},
+  {"id":"mine","name":"Miny","damage":34,"fireRate":0.55,"range":2.4,"projectileSpeed":0,"splashRadius":5,"knockbackForce":10500,"ammoCapacity":10,"energyConsumption":0,"heatGeneration":0}
+]

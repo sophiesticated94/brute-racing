@@ -1,0 +1,56 @@
+name: Build and race
+on: [push, pull_request]
+jobs:
+  game:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.400
+      - name: Install Godot .NET and desktop export templates
+        shell: pwsh
+        run: ./scripts/setup.ps1 -ExportTemplates
+      - name: Domain and protocol tests
+        shell: pwsh
+        run: ./scripts/test.ps1
+      - name: Network combat under 100 ms RTT and 3 percent unreliable packet loss
+        shell: pwsh
+        run: ./scripts/integration.ps1 -Impaired -Combat
+      - name: Dedicated server and rematch
+        shell: pwsh
+        run: ./scripts/integration.ps1 -Dedicated -Rounds 2 -Port 29848
+      - name: Connection loss and AI takeover
+        shell: pwsh
+        run: ./scripts/connection-tests.ps1 -SkipBuild
+      - name: Export Windows and Linux
+        shell: pwsh
+        run: ./scripts/export.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mini-car-mayhem
+          path: |
+            artifacts/windows/
+            artifacts/linux/
+            artifacts/tests/
+  linux-smoke:
+    needs: game
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: mini-car-mayhem
+          path: build
+      - name: Run exported Linux game
+        run: |
+          chmod +x build/linux/MiniCarMayhem.x86_64
+          build/linux/MiniCarMayhem.x86_64 --headless --fixed-fps 60 -- --smoke --bots=7 --results="$PWD/linux-report.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-smoke-report
+          path: linux-report.json

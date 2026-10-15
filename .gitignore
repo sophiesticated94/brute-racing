@@ -1,0 +1,8 @@
+.tools/
+.godot/
+**/bin/
+**/obj/
+src/Game.Client/data/
+artifacts/
+TestResults/
+*.user
