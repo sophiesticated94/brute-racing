@@ -1,0 +1,9 @@
+[
+  {"id":"stock","name":"Fabryczny Rook","type":"stock","color":"ffffff","price":0},
+  {"id":"ember","name":"Pasy Żaru","type":"stripe","color":"f06546","price":60},
+  {"id":"ice","name":"Pasy Lodowca","type":"stripe","color":"50d7dd","price":60},
+  {"id":"carbon","name":"Karbonowa Maska","type":"hood","color":"202e3b","price":90},
+  {"id":"checker","name":"Szachownica","type":"checker","color":"fff0d0","price":120},
+  {"id":"mint_trail","name":"Miętowa Smuga","type":"trail","color":"45dfaa","price":100},
+  {"id":"violet_trail","name":"Fioletowa Smuga","type":"trail","color":"ad98f9","price":100}
+]

@@ -155,6 +155,7 @@ public partial class Main
         if (r.Respawn > 0 || r.Invulnerable > 0 || r.Progress.Finished || phase != RacePhase.Racing) return;
         float actualDamage = Mathf.Min(r.Car.Health, amount * (1 - r.Car.Stats.Armor * (1 - armorPenetration)));
         r.Car.Health -= actualDamage; r.LastDamage = now;
+        if(attacker!=r.Info.Id && actualDamage>0 && racers.TryGetValue(attacker,out var source)){source.Hits++;if(r.Car.Health<=0)source.Kills++;}
         r.Car.ApplyCentralImpulse(impulse * (1 - r.Car.Stats.KnockbackResistance));
         Emit("hit", attacker, r.Info.Id, r.Car.GlobalPosition + Vector3.Up * .5f, Vector3.Zero, actualDamage);
         if (r.Car.Health <= 0) Destroy(r);

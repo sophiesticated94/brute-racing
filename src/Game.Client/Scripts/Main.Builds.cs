@@ -18,6 +18,8 @@ public partial class Main
             rejectedBuilds++; SendControl(sender,new("build_error",Message:"Odrzucono nieprawidłowy build."));
             GD.Print($"BUILD_REJECT peer={sender}"); return;
         }
+        if(campaign is not null && !campaign.TrySetLoadout(sender,loadout,balanceRules,out _))
+        {rejectedBuilds++;SendControl(sender,new("build_error",Message:"Brak wyposażenia lub punktów zdobytych w tej kampanii."));return;}
         players[sender] = player with { Name=CleanName(message.Name),Color=message.Color,Loadout=ValidateBuild(loadout,message.Color)!,Ready=false };
         PublishLobby();
     }
@@ -55,6 +57,13 @@ public partial class Main
     {
         int primary = arguments.TryGetValue("weapon-level",out var level) ? Math.Clamp(int.Parse(level),1,5) : 1;
         int mine = arguments.TryGetValue("mine-level",out var mines) ? Math.Clamp(int.Parse(mines),1,5) : 1;
-        return new("rook",ui.WeaponId,primary,new(),mine);
+        if(gameMode==GameMode.Quick)return profile.Presets[profile.SelectedPreset].Loadout with{CosmeticId=profile.SelectedCosmetic};
+        if(gameMode==GameMode.Campaign)
+        {
+            var own=campaignView?.Players.FirstOrDefault(p=>p.Id==localId);
+            if(own is not null)return own.Loadout with{WeaponId=ui.WeaponId,WeaponLevel=own.OwnedLevels.GetValueOrDefault(ui.WeaponId,1),CosmeticId=profile.SelectedCosmetic};
+            return new("rook",ui.WeaponId,1,new(),1,1,profile.SelectedCosmetic);
+        }
+        return new("rook",ui.WeaponId,primary,new(),mine,CosmeticId:profile.SelectedCosmetic);
     }
 }

@@ -14,6 +14,21 @@ public partial class GameUi : CanvasLayer
     public OptionButton Paint { get; private set; } = null!;
     public SpinBox Bots { get; private set; } = null!;
     public CheckBox Internet { get; private set; } = null!;
+    public SpinBox CampaignLength {get;private set;}=null!;
+    public OptionButton Preset {get;private set;}=null!;
+    public LineEdit DirectoryUrl {get;private set;}=null!;
+    public event Action? GarageRequested,QuickRequested,CancelQueueRequested;
+    public event Action<int>? PresetSelected;
+    private Label campaignCaption=null!,connectionStatus=null!;
+    public void UpdatePresets(PlayerProfile profile)
+    {Preset.Clear();for(int i=0;i<3;i++)Preset.AddItem($"ARCHIWUM {i+1}: {profile.Presets[i].Name}");Preset.Select(profile.SelectedPreset);}
+    public void ShowCampaign(CampaignView? campaign,int ownId)
+    {
+        var own=campaign?.Players.FirstOrDefault(p=>p.Id==ownId);
+        campaignCaption.Text=campaign is null?"Miedziany Kanion / 3 okrążenia":$"KAMPANIA {Math.Min(campaign.CompletedRounds+1,campaign.Length)}/{campaign.Length} • {(own is null?"":$"{own.Credits} KR / {own.AvailablePoints} SP")}";
+    }
+    public void ConnectionStatus(string text)=>connectionStatus.Text=text;
+    public void QueueStatus(string text)=>Notice(text,5);
     private Control root = null!, menu = null!, lobby = null!, hud = null!, podium = null!, pause = null!;
     private Label lobbyList = null!, status = null!, raceInfo = null!, leaderboard = null!, resources = null!, countdown = null!, result = null!, respawn = null!;
     private ProgressBar health = null!, energy = null!;
@@ -37,7 +52,8 @@ public partial class GameUi : CanvasLayer
         var build = new Label { Text = "VOL. 01   •   CINDER CIRCUIT", AnchorLeft = 1, AnchorRight = 1, OffsetLeft = -340, OffsetTop = 26, OffsetRight = -32, OffsetBottom = 60, HorizontalAlignment = HorizontalAlignment.Right };
         Font(build, 14, Muted); root.AddChild(build);
         menu = Card(new(38, 87), new(445, 694));
-        var m = Stack(menu);
+        var menuScroll=new ScrollContainer{CustomMinimumSize=new(395,645)};menu.AddChild(menuScroll);
+        var m = Stack(menuScroll);m.CustomMinimumSize=new(375,0);m.SizeFlagsHorizontal=Control.SizeFlags.ExpandFill;
         AddText(m, "MINI CAR\nMAYHEM", 57, Ink);
         AddText(m, "MAŁE AUTA. DUŻY CHAOS.", 16, Accent);
         AddText(m, "Miedziany Kanion  /  3 okrążenia\nWyścigi bojowe • 1–8 kierowców", 16, Muted);
@@ -46,18 +62,25 @@ public partial class GameUi : CanvasLayer
         Weapon = new OptionButton(); foreach (string w in new[] { "Karabin · szybki i celny", "Laser · energia i przegrzanie", "Rakiety · obrażenia obszarowe" }) Weapon.AddItem(w); m.AddChild(Weapon);
         Paint = new OptionButton(); foreach (string color in new[] { "Bursztyn", "Turkus", "Koral", "Lawenda", "Limonka", "Kość słoniowa", "Pomarańcz", "Kobalt" }) Paint.AddItem(color); m.AddChild(Paint);
         Bots = new SpinBox { MinValue = 0, MaxValue = 7, Value = 3, Prefix = "Boty: " }; m.AddChild(Bots);
-        AddButton(m, "SZYBKI WYŚCIG", () => SoloRequested?.Invoke(), true);
+        CampaignLength=new SpinBox{MinValue=3,MaxValue=10,Value=6,Prefix="Wyścigi kampanii: "};m.AddChild(CampaignLength);
+        AddButton(m, "KAMPANIA SOLO", () => SoloRequested?.Invoke(), true);
+        Preset=new OptionButton();for(int i=0;i<3;i++)Preset.AddItem($"ARCHIWUM {i+1}");m.AddChild(Preset);Preset.ItemSelected+=i=>PresetSelected?.Invoke((int)i);
+        AddButton(m,"GARAŻ / ARCHIWUM / KOSMETYKA",()=>GarageRequested?.Invoke());
+        DirectoryUrl=new LineEdit{Text="",PlaceholderText="Adres katalogu HTTPS (lub http://localhost:5080)",MaxLength=256};m.AddChild(DirectoryUrl);
+        AddButton(m,"SZYBKI MULTIPLAYER",()=>QuickRequested?.Invoke(),true);
+        AddButton(m,"ANULUJ SZUKANIE",()=>CancelQueueRequested?.Invoke());
         var connection = new HBoxContainer(); m.AddChild(connection);
         Address = new LineEdit { Text = "127.0.0.1", PlaceholderText = "Adres IP hosta", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; connection.AddChild(Address);
         Port = new SpinBox { MinValue = 1024, MaxValue = 65535, Value = 28747, CustomMinimumSize = new(120, 0) }; connection.AddChild(Port);
         Internet = new CheckBox { Text = "Host internetowy · spróbuj UPnP" }; m.AddChild(Internet);
         var network = new HBoxContainer(); m.AddChild(network);
-        AddButton(network, "UTWÓRZ POKÓJ", () => HostRequested?.Invoke());
+        AddButton(network, "HOST KAMPANII", () => HostRequested?.Invoke());
         AddButton(network, "DOŁĄCZ", () => JoinRequested?.Invoke());
         Weapon.ItemSelected += _ => LoadoutChanged?.Invoke(); Paint.ItemSelected += _ => LoadoutChanged?.Invoke();
         PlayerName.TextChanged += _ => LoadoutChanged?.Invoke();
         lobby = Card(new(38, 87), new(445, 610)); var l = Stack(lobby);
-        AddText(l, "PADDOCK", 40, Ink); AddText(l, "Miedziany Kanion  /  3 okrążenia", 16, Accent);
+        AddText(l, "PADDOCK", 40, Ink); campaignCaption=AddText(l, "Miedziany Kanion  /  3 okrążenia", 16, Accent);
+        connectionStatus=AddText(l,"LAN / ręczne przekierowanie UDP",13,Muted);
         balanceOption = new OptionButton(); foreach (var mode in new[] { "Stock · 0 SP / poz. 1", "FairCap · 15 SP / poz. 3", "OpenMayhem · 30 SP / poz. 5" }) balanceOption.AddItem(mode);
         l.AddChild(balanceOption); balanceOption.ItemSelected += index => BalanceChanged?.Invoke((LobbyBalanceMode)index);
         AddText(l, "ROOK  /  wybierz uzbrojenie i lakier", 15, Muted);
@@ -66,7 +89,8 @@ public partial class GameUi : CanvasLayer
         lobbyWeapon.ItemSelected += index => { Weapon.Select((int)index); LoadoutChanged?.Invoke(); };
         lobbyPaint.ItemSelected += index => { Paint.Select((int)index); LoadoutChanged?.Invoke(); };
         lobby.VisibilityChanged += () => { lobbyWeapon.Select(Weapon.Selected); lobbyPaint.Select(Paint.Selected); };
-        lobbyList = AddText(l, "", 17, Ink); lobbyList.CustomMinimumSize = new(0, 180);
+        lobbyList = AddText(l, "", 16, Ink); lobbyList.CustomMinimumSize = new(0, 165);
+        AddButton(l,"GARAŻ / DRZEWKO / PRESETY",()=>GarageRequested?.Invoke());
         ready = AddButton(l, "GOTOWY / NIEGOTOWY", () => ReadyRequested?.Invoke(), true);
         start = AddButton(l, "START WYŚCIGU", () => StartRequested?.Invoke());
         AddButton(l, "WYJDŹ Z POKOJU", () => LeaveRequested?.Invoke()); lobby.Visible = false;
@@ -110,7 +134,7 @@ public partial class GameUi : CanvasLayer
     public void ShowLobby(LobbyPlayer[] players, bool isHost, int local)
     {
         menu.Visible = false; lobby.Visible = true; hud.Visible = podium.Visible = pause.Visible = false;
-        lobbyList.Text = string.Join("\n", players.Select((p, i) => $"{i + 1:00}  {p.Name}{(p.Id == local ? " ◂" : "")}   /   {(p.Bot ? "AI" : p.Ready ? "GOTOWY" : "…")}"));
+        lobbyList.Text = string.Join("\n", players.Select((p, i) => $"{i+1:00} {p.Name[..Math.Min(12,p.Name.Length)]}{(p.Id==local?" ◂":"")} {(p.Bot?"AI":p.Ready?"✓":"…")}  W{p.Loadout.WeaponLevel} M{p.Loadout.MineLevel}"));
         start.Visible = isHost; start.Disabled = players.Length < 2 || players.Any(p => !p.Ready);
         ready.Text = players.FirstOrDefault(p => p.Id == local)?.Ready == true ? "GOTOWY ✓  /  ZMIEŃ" : "ZGŁOŚ GOTOWOŚĆ";
     }

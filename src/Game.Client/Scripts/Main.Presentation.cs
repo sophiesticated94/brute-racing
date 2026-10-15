@@ -95,6 +95,12 @@ public partial class Main
             lines.Add($"{i + 1:00}   {r.Info.Name}\n       {(finish >= 0 ? GameUi.TimeText(finish) : "NIE UKOŃCZYŁ")}");
             r.Car.Driving = false;
         }
+        if(campaignView is {Complete:true} finalCampaign)
+        {
+            lines.Clear();lines.Add("KAMPANIA UKOŃCZONA");
+            for(int i=0;i<finalCampaign.Ranking.Length;i++){int id=finalCampaign.Ranking[i];var own=finalCampaign.Players.First(p=>p.Id==id);lines.Add($"{i+1:00}   {players.GetValueOrDefault(id)?.Name ?? "Kierowca"}  •  {own.ChampionshipPoints} pkt");}
+            lines.Add($"Monety: {profile.Coins} • końcowy build czeka w garażu.");
+        }
         ui.ShowResults(string.Join("\n", lines), isHost);
     }
 
@@ -155,7 +161,7 @@ public partial class Main
     public override void _UnhandledKeyInput(InputEvent @event)
     {
         if (@event is not InputEventKey { Pressed: true, Echo: false } key) return;
-        if (key.PhysicalKeycode == Key.Escape) ui.TogglePause();
+        if (key.PhysicalKeycode == Key.Escape) { if(garage.IsOpen)garage.Close();else ui.TogglePause(); }
         if (key.PhysicalKeycode == Key.M) { audio.Muted = !audio.Muted; ui.Notice(audio.Muted ? "Dźwięk wyłączony" : "Dźwięk włączony", 2); }
     }
     private void SaveScreenshot()

@@ -20,6 +20,7 @@ public partial class Main : Node3D
         public float Unstuck;
         public float DriftCharge, BoostRemaining;
         public bool WasDrifting;
+        public int Hits,Kills;
         public double LastDamage = double.NegativeInfinity;
         public Vector3 PreviousPosition = car.Position;
         public VehicleState? NetworkState;
@@ -123,12 +124,13 @@ public partial class Main : Node3D
             BuildWorld();
             ui = new GameUi(); AddChild(ui); audio = new GameAudio(); AddChild(audio);
             ui.ConfigureMap(track.Path);
+            InitializeProgression();
             ui.BalanceChanged += mode => SetBalance(mode);
             if (arguments.TryGetValue("balance", out var balance)) SetBalance(balance.ToLowerInvariant() switch { "faircap" => LobbyBalanceMode.FairCap, "open" or "openmayhem" => LobbyBalanceMode.OpenMayhem, _ => LobbyBalanceMode.Stock });
             else if (arguments.ContainsKey("weapon-level") || arguments.ContainsKey("mine-level")) SetBalance(LobbyBalanceMode.OpenMayhem);
-            ui.SoloRequested += StartSolo; ui.HostRequested += StartHosting; ui.JoinRequested += JoinHost;
+            ui.SoloRequested += LaunchCampaignSolo; ui.HostRequested += LaunchCampaignHost; ui.JoinRequested += LaunchCampaignJoin;
             ui.ReadyRequested += ToggleReady; ui.StartRequested += TryStartRace; ui.LeaveRequested += () => Leave("Sesja zakończona.");
-            ui.ReplayRequested += () => { if (isHost) StartRace(); }; ui.LoadoutChanged += ChangeLoadout;
+            ui.ReplayRequested += ReplayRequested; ui.LoadoutChanged += ChangeLoadout;
             if (arguments.TryGetValue("port", out var port)) ui.Port.Value = int.Parse(port);
             if (arguments.TryGetValue("bots", out var bots)) ui.Bots.Value = Math.Clamp(int.Parse(bots), 0, 7);
             if (arguments.TryGetValue("weapon", out var weapon)) ui.Weapon.Select(weapon == "laser" ? 1 : weapon == "rocket" ? 2 : 0);
@@ -136,6 +138,7 @@ public partial class Main : Node3D
             if (arguments.TryGetValue("join", out var address)) { ui.Address.Text = address; JoinHost(); }
             else if (arguments.ContainsKey("host")) StartHosting();
             else if (smoke || arguments.ContainsKey("solo")) StartSolo();
+            if(arguments.ContainsKey("garage-preview"))PreviewGarage();
         }
         catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
@@ -146,16 +149,16 @@ public partial class Main : Node3D
     {
         LeaveInternal(); inSession = isHost = true; localId = 1;
         players[1] = new(1, SelectedName(), (int)ui.Paint.Selected, true, false, SelectedLoadout());
-        AddBots((int)ui.Bots.Value); StartRace();
+        AddBots((int)ui.Bots.Value); EnsureCampaign(); StartRace();
     }
     private void StartHosting()
     {
         try
         {
-            LeaveInternal(); transport = CreateTransport(); transport.Host((int)ui.Port.Value, 8);
+            LeaveInternal(); transport = CreateTransport(); transport.Host((int)ui.Port.Value, dedicated ? 9 : 8);
             inSession = isHost = true; localId = dedicated ? 0 : 1;
             if (!dedicated) players[1] = new(1, SelectedName(), (int)ui.Paint.Selected, autoStart, false, SelectedLoadout());
-            AddBots((int)ui.Bots.Value); connectionStart = now; autoStartAt = now + 2;
+            AddBots((int)ui.Bots.Value); EnsureCampaign(); connectionStart = now; autoStartAt = now + 2;
             PublishLobby(); ui.Notice($"Host UDP :{ui.Port.Value:0}  •  dołącz po adresie IP", 8);
             if (ui.Internet.ButtonPressed) MapPort((int)ui.Port.Value);
             GD.Print($"HOST_READY port={(int)ui.Port.Value}");
@@ -186,7 +189,9 @@ public partial class Main : Node3D
         if (!inSession || phase != RacePhase.Lobby) return;
         if (isHost && players.TryGetValue(localId, out var p))
         {
-            players[localId] = p with { Name = SelectedName(), Color = (int)ui.Paint.Selected, Loadout = SelectedLoadout(), Ready = false }; PublishLobby();
+            var build=SelectedLoadout();
+            if(campaign is not null && !campaign.TrySetLoadout(localId,build,balanceRules,out _))return;
+            players[localId] = p with { Name = SelectedName(), Color = (int)ui.Paint.Selected, Loadout = build, Ready = false }; PublishLobby();
         }
         else SendControl(1, new("loadout", Name: SelectedName(), Color: (int)ui.Paint.Selected, Loadout: SelectedLoadout()));
     }
@@ -199,17 +204,18 @@ public partial class Main : Node3D
     private void PublishLobby()
     {
         if (!inSession) return;
+        if(campaign is not null)SynchronizeCampaign();
         var all = players.Values.ToArray(); ui.ShowLobby(all, isHost, localId); ui.ShowBalance(balanceRules,isHost); SendControl(0, new("lobby", Players: all, BalanceRules: balanceRules));
     }
     private void TryStartRace()
     {
-        if (!isHost || players.Count < 2 || players.Values.Any(p => !p.Ready)) return;
+        if (!isHost || (transport is not null && players.Count < 2) || players.Values.Any(p => !p.Ready)) return;
         StartRace();
     }
     private void StartRace()
     {
         if (!isHost) return;
-        raceId++;
+        raceId++; raceSessionId=Guid.NewGuid();
         SendControl(0, new("start", Players: players.Values.ToArray(), RaceId: raceId, BalanceRules: balanceRules));
         InitializeRace();
     }
@@ -227,6 +233,7 @@ public partial class Main : Node3D
             // Remote interpolated bodies are presentation proxies. Only the host resolves
             // car-to-car collisions; frozen proxies must not block the local predictor.
             if (!isHost) { car.CollisionLayer = p.Id == localId ? 2u : 0u; car.CollisionMask = p.Id == localId ? 1u : 0u; }
+            car.ApplyCosmetic(catalog.Cosmetics[p.Loadout.CosmeticId]);
             car.ResetAt(track.Spawn(slot++), track.YawAt(0)); car.TurretYaw = desiredAim = track.YawAt(0);
             var racer = new Racer(p, car, new(catalog.Track.Checkpoints, catalog.Track.Laps));
             racer.Build = VehicleStatsCalculator.CalculateBuild(catalog, p.Loadout);
@@ -265,7 +272,7 @@ public partial class Main : Node3D
         if (racers.TryGetValue(localId, out var local))
         {
             var command = autoPlay ? BotInput(local, ++localSequence) : ReadInput(local, ++localSequence);
-            if (ui.BlockingInput) command = command.Neutral;
+            if (ui.BlockingInput || garage.IsOpen) command = command.Neutral;
             if (isHost) local.Gate.Accept(command, now);
             else
             {
@@ -311,7 +318,7 @@ public partial class Main : Node3D
             roundReports.Add(new { raceId, ranking = finalRanking, events = new Dictionary<string, int>(eventCounts) });
             if (completedRaces < requiredRounds)
             {
-                if (isHost) GetTree().CreateTimer(1).Timeout += StartRace;
+                if (isHost) GetTree().CreateTimer(1).Timeout += () => { if(gameMode==GameMode.Campaign)BeginIntermission();else StartRace(); };
             }
             else
             {
@@ -335,7 +342,7 @@ public partial class Main : Node3D
     }
     private void FinishRace()
     {
-        finalRanking = Ranking(); Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), false, 2);
+        finalRanking = Ranking(); AwardRace(); Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), false, 2);
         // Final state is reliable, so the podium does not depend on the last unreliable snapshot.
         Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), true, 0);
         SendControl(0, new("results", Ranking: finalRanking, RaceId: raceId)); ShowPodium();
@@ -350,16 +357,16 @@ public partial class Main : Node3D
     private void LeaveInternal()
     {
         transport?.Dispose(); transport = null; inSession = false; phase = RacePhase.Lobby;
-        players.Clear(); acceptedHello.Clear(); sentBuildProbes = false; delayed.Clear(); finalRanking = []; if (raceRoot is not null) ClearRace();
+        players.Clear(); acceptedHello.Clear(); sentBuildProbes = false; campaign=null;campaignView=null;garage?.Close(); delayed.Clear(); finalRanking = []; if (raceRoot is not null) ClearRace();
     }
-    private void Leave(string message) { LeaveInternal(); ui.ShowMenu(); ui.Notice(message, 7); GD.Print(message); }
+    private void Leave(string message) { SaveProfile(); LeaveInternal(); ui.ShowMenu(); ui.Notice(message, 7); GD.Print(message); }
     private void WriteResults(bool success)
     {
         resultsWritten = true;
         var snapshot = CreateSnapshot();
         var report = new
         {
-            success, host = isHost, localId, tick, phase = phase.ToString(), elapsed = raceElapsed,
+            success, host = isHost, localId, tick, mode=gameMode.ToString(), campaign=campaign?.View()??campaignView, coins=profile.Coins, profileRaces=profile.CompletedRaces, profileCampaigns=profile.CompletedCampaigns, phase = phase.ToString(), elapsed = raceElapsed,
             ranking = Ranking(), receivedSnapshots, shots, destructions, checkpointPasses, rejectedBuilds,
             simulatedFps = frameTotal > 0 ? frameCount / frameTotal : 0,
             averageFps = wallFrameTotal > 0 ? (frameCount - 1) / wallFrameTotal : 0, worstFrameMs = wallWorstFrame * 1000,
@@ -374,5 +381,5 @@ public partial class Main : Node3D
         if (resultPath.Length > 0) { Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(resultPath))!); System.IO.File.WriteAllText(resultPath, json); }
         GD.Print("SMOKE_RESULT " + JsonSerializer.Serialize(report));
     }
-    public override void _ExitTree() { transport?.Dispose(); }
+    public override void _ExitTree() { if(ui is not null)SaveProfile(); transport?.Dispose(); }
 }

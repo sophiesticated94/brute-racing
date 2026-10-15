@@ -2,7 +2,7 @@
   {
     "id": "drive_accel",
     "name": "Wtrysk",
-    "description": "Wtrysk — wzmacnia Acceleration.",
+    "description": "Wtrysk — wzmacnia przyspieszenie.",
     "branch": "Drive",
     "position": {
       "x": 0,
@@ -53,7 +53,7 @@
   {
     "id": "drive_speed",
     "name": "Długie przełożenie",
-    "description": "Długie przełożenie — wzmacnia MaxSpeed.",
+    "description": "Długie przełożenie — wzmacnia prędkość maksymalną.",
     "branch": "Drive",
     "position": {
       "x": 0,
@@ -109,7 +109,7 @@
   {
     "id": "drive_grip",
     "name": "Opony sportowe",
-    "description": "Opony sportowe — wzmacnia Grip.",
+    "description": "Opony sportowe — wzmacnia przyczepność.",
     "branch": "Drive",
     "position": {
       "x": 0,
@@ -165,7 +165,7 @@
   {
     "id": "drive_drift",
     "name": "Kontrola poślizgu",
-    "description": "Kontrola poślizgu — wzmacnia DriftFactor.",
+    "description": "Kontrola poślizgu — wzmacnia kontrolę poślizgu.",
     "branch": "Drive",
     "position": {
       "x": 0,
@@ -221,7 +221,7 @@
   {
     "id": "drive_mass",
     "name": "Taranujące podwozie",
-    "description": "Taranujące podwozie — wzmacnia Mass.",
+    "description": "Taranujące podwozie — wzmacnia masę auta.",
     "branch": "Drive",
     "position": {
       "x": 0,
@@ -305,7 +305,7 @@
   {
     "id": "ballistics_traverse",
     "name": "Szybka wieżyczka",
-    "description": "Szybka wieżyczka — wzmacnia TurretTraverseSpeed.",
+    "description": "Szybka wieżyczka — wzmacnia szybkość wieżyczki.",
     "branch": "Ballistics",
     "position": {
       "x": 290,
@@ -356,7 +356,7 @@
   {
     "id": "ballistics_rate",
     "name": "Podajnik",
-    "description": "Podajnik — wzmacnia FireRate.",
+    "description": "Podajnik — wzmacnia szybkostrzelność.",
     "branch": "Ballistics",
     "position": {
       "x": 290,
@@ -412,7 +412,7 @@
   {
     "id": "ballistics_ammo",
     "name": "Duży magazynek",
-    "description": "Duży magazynek — wzmacnia AmmoCapacity.",
+    "description": "Duży magazynek — wzmacnia zapas amunicji.",
     "branch": "Ballistics",
     "position": {
       "x": 290,
@@ -468,7 +468,7 @@
   {
     "id": "ballistics_projectile",
     "name": "Przyspieszacz pocisków",
-    "description": "Przyspieszacz pocisków — wzmacnia ProjectileSpeed.",
+    "description": "Przyspieszacz pocisków — wzmacnia prędkość pocisków.",
     "branch": "Ballistics",
     "position": {
       "x": 290,
@@ -580,7 +580,7 @@
   {
     "id": "ballistics_pierce",
     "name": "Pociski przeciwpancerne",
-    "description": "Pociski przeciwpancerne — wzmacnia ArmorPenetration.",
+    "description": "Pociski przeciwpancerne — wzmacnia pancerzPenetration.",
     "branch": "Ballistics",
     "position": {
       "x": 290,
@@ -614,7 +614,7 @@
   {
     "id": "energy_efficiency",
     "name": "Oszczędna wiązka",
-    "description": "Oszczędna wiązka — wzmacnia EnergyConsumption.",
+    "description": "Oszczędna wiązka — wzmacnia zużycie energii.",
     "branch": "Energy",
     "position": {
       "x": 580,
@@ -665,7 +665,7 @@
   {
     "id": "energy_cooling",
     "name": "Wydajne chłodzenie",
-    "description": "Wydajne chłodzenie — wzmacnia CoolingRate.",
+    "description": "Wydajne chłodzenie — wzmacnia chłodzenie.",
     "branch": "Energy",
     "position": {
       "x": 580,
@@ -721,7 +721,7 @@
   {
     "id": "energy_heat",
     "name": "Kontrola temperatury",
-    "description": "Kontrola temperatury — wzmacnia HeatGeneration.",
+    "description": "Kontrola temperatury — wzmacnia wytwarzane ciepło.",
     "branch": "Energy",
     "position": {
       "x": 580,
@@ -777,7 +777,7 @@
   {
     "id": "energy_resume",
     "name": "Szybki restart",
-    "description": "Szybki restart — wzmacnia OverheatResume.",
+    "description": "Szybki restart — wzmacnia próg ponownego strzału.",
     "branch": "Energy",
     "position": {
       "x": 580,
@@ -833,7 +833,7 @@
   {
     "id": "energy_regen",
     "name": "Alternator",
-    "description": "Alternator — wzmacnia EnergyRegen.",
+    "description": "Alternator — wzmacnia regenerację energii.",
     "branch": "Energy",
     "position": {
       "x": 580,
@@ -917,7 +917,7 @@
   {
     "id": "defense_health",
     "name": "Wzmocniona klatka",
-    "description": "Wzmocniona klatka — wzmacnia MaxHealth.",
+    "description": "Wzmocniona klatka — wzmacnia wytrzymałość.",
     "branch": "Defense",
     "position": {
       "x": 870,
@@ -968,7 +968,7 @@
   {
     "id": "defense_armor",
     "name": "Pancerz warstwowy",
-    "description": "Pancerz warstwowy — wzmacnia Armor.",
+    "description": "Pancerz warstwowy — wzmacnia pancerz.",
     "branch": "Defense",
     "position": {
       "x": 870,
@@ -1024,7 +1024,7 @@
   {
     "id": "defense_resist",
     "name": "Amortyzatory wybuchowe",
-    "description": "Amortyzatory wybuchowe — wzmacnia KnockbackResistance.",
+    "description": "Amortyzatory wybuchowe — wzmacnia odporność na odrzut.",
     "branch": "Defense",
     "position": {
       "x": 870,
@@ -1080,7 +1080,7 @@
   {
     "id": "defense_protection",
     "name": "Osłona odrodzenia",
-    "description": "Osłona odrodzenia — wzmacnia ProtectionBonus.",
+    "description": "Osłona odrodzenia — wzmacnia ochronę po odrodzeniu.",
     "branch": "Defense",
     "position": {
       "x": 870,
@@ -1136,7 +1136,7 @@
   {
     "id": "defense_delay",
     "name": "Szybka naprawa",
-    "description": "Szybka naprawa — wzmacnia RegenDelay.",
+    "description": "Szybka naprawa — wzmacnia czas do regeneracji.",
     "branch": "Defense",
     "position": {
       "x": 870,
@@ -1220,7 +1220,7 @@
   {
     "id": "sabotage_damage",
     "name": "Ładunek miny",
-    "description": "Ładunek miny — wzmacnia Damage.",
+    "description": "Ładunek miny — wzmacnia obrażenia.",
     "branch": "Sabotage",
     "position": {
       "x": 1160,
@@ -1271,7 +1271,7 @@
   {
     "id": "sabotage_radius",
     "name": "Promień detonacji",
-    "description": "Promień detonacji — wzmacnia SplashRadius.",
+    "description": "Promień detonacji — wzmacnia promień eksplozji.",
     "branch": "Sabotage",
     "position": {
       "x": 1160,
@@ -1327,7 +1327,7 @@
   {
     "id": "sabotage_capacity",
     "name": "Stojak na miny",
-    "description": "Stojak na miny — wzmacnia MaxActive.",
+    "description": "Stojak na miny — wzmacnia limit min.",
     "branch": "Sabotage",
     "position": {
       "x": 1160,
@@ -1383,7 +1383,7 @@
   {
     "id": "sabotage_arming",
     "name": "Czuły zapalnik",
-    "description": "Czuły zapalnik — wzmacnia ArmingTime.",
+    "description": "Czuły zapalnik — wzmacnia czas uzbrajania.",
     "branch": "Sabotage",
     "position": {
       "x": 1160,

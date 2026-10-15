@@ -29,6 +29,7 @@ public sealed class BuildValidator(GameCatalog catalog)
         if (!catalog.Cars.ContainsKey(d.CarId ?? "")) errors.Add("Nieznane podwozie.");
         if (!catalog.Weapons.ContainsKey(d.PrimaryWeaponId ?? "") || d.PrimaryWeaponId == "mine") errors.Add("Nieprawidłowa broń główna.");
         if (d.Color is < 0 or > 7 || d.PrimaryLevel is < 1 or > 5 || d.MineLevel is < 1 or > 5 || d.PlayerLevel is < 1 or > 6) errors.Add("Nieprawidłowy poziom lub kolor.");
+        if(!catalog.Cosmetics.ContainsKey(d.CosmeticId??"")) errors.Add("Nieznana kosmetyka.");
         if (d.SkillRanks is null || d.SkillRanks.Count > catalog.Skills.Nodes.Count) errors.Add("Nieprawidłowe rangi.");
         else
         {

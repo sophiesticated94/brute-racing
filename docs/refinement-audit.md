@@ -43,3 +43,7 @@ Build bez błędów; 24 testy xUnit; impaired/combat PASS; przejęcie AI i utrat
 
 ## Etap DAG i walidacji — wynik
 32 testy xUnit; verify-stage skills PASS, w tym pięć odrzuconych sfałszowanych deklaracji na klienta ENet. FairCap testowany jako kopia z poprawnymi zależnościami.
+
+## Etap 4 — kampania i profil
+
+38 testów domeny/profilu oraz pełna weryfikacja `verify-stage.ps1 -Stage progression`: build, ENet impaired/combat, rozłączenia i 8 aut headless — PASS. Dodatkowy `integration.ps1 -Campaign -Impaired -Combat` ukończył 3 rundy w oddzielnych procesach z tym samym stanem kampanii i nagrodami; każdy profil ma 3 wyścigi i 1 kampanię. Profile testowe są izolowane w artifacts. Sprawdzono render garażu (pan/zoom DAG, panel statystyk, archiwum i kosmetyka).

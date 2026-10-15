@@ -78,7 +78,7 @@ public partial class Main
             if (m.Kind == "ping" && players.ContainsKey(sender)) { SendControl(sender, new("pong", SentTime: m.SentTime)); return; }
             if (m.Kind == "hello")
             {
-                if (phase != RacePhase.Lobby || acceptedHello.ContainsKey(sender)) { transport?.Disconnect(sender); return; }
+                if (phase != RacePhase.Lobby || campaign?.CompletedRounds>0 || acceptedHello.ContainsKey(sender)) { transport?.Disconnect(sender); return; }
                 if (m.Protocol != 2 || m.ContentHash != contentHash || !new BuildValidator(catalog).IsValid(m.Loadout) || m.Color is < 0 or > 7 || m.Name is null || m.Name.Length > 20)
                 {
                     SendControl(sender, new("error", Message: "Niezgodna wersja gry, dane lub build.")); transport?.Disconnect(sender); return;
@@ -96,6 +96,7 @@ public partial class Main
             }
             else if (phase == RacePhase.Lobby && players.TryGetValue(sender, out var player))
             {
+                if (m.Kind == "campaign_action")HandleCampaignAction(sender,m.Message,m.ItemId);
                 if (m.Kind == "ready") { players[sender] = player with { Ready = !player.Ready }; PublishLobby(); }
                 if (m.Kind == "loadout") HandleBuildRequest(sender,m);
             }
@@ -103,10 +104,12 @@ public partial class Main
         else if (sender == 1)
         {
             if (m.Kind == "pong") { diagnostics.ObserveRtt(now - m.SentTime); return; }
-            if (m.Kind == "build_error") { ui.Notice(m.Message,3); return; }
+            if (m.Kind == "build_error") { ui.Notice(m.Message,3); if(garage.IsOpen)garage.Notify(m.Message); return; }
+            if(m.Kind=="reward" && m.Reward is not null){AcceptReward(m.Reward);return;}
             if (m.Kind == "error") { Leave(m.Message); return; }
             if (m.Kind is "lobby" or "start" or "roster")
             {
+                UpdateCampaignMessage(m);
                 if (m.Players is null || m.Players.Length > 8 || m.Players.Any(p => !new BuildValidator(catalog).IsValid(p.Loadout) || p.Color is < 0 or > 7)) throw new InvalidDataException("Roster.");
                 if (m.BalanceRules is not null) { if (!m.BalanceRules.IsValid) throw new InvalidDataException("Balance rules."); balanceRules = m.BalanceRules; }
                 players.Clear(); foreach (var p in m.Players) players.Add(p.Id, p);
@@ -114,7 +117,7 @@ public partial class Main
                 else if (m.Kind == "lobby") { phase = RacePhase.Lobby; ui.ShowLobby(players.Values.ToArray(), false, localId); ui.ShowBalance(balanceRules,false); ProbeBuilds(); }
                 else foreach (var p in players.Values) if (racers.TryGetValue(p.Id, out var r)) r.Info = p;
             }
-            if (m.Kind == "results" && m.RaceId == raceId && m.Ranking is not null) { finalRanking = m.Ranking; phase = RacePhase.Podium; ShowPodium(); }
+            if (m.Kind == "results" && m.RaceId == raceId && m.Ranking is not null) { UpdateCampaignMessage(m); finalRanking = m.Ranking; phase = RacePhase.Podium; ShowPodium(); }
         }
     }
     private static string CleanName(string name)
@@ -122,7 +125,12 @@ public partial class Main
         var clean = new string(name.Where(c => !char.IsControl(c)).Take(20).ToArray()).Trim();
         return clean.Length == 0 ? "Kierowca" : clean;
     }
-    private void SendControl(int target, SessionMessage message) => Send(target, PacketCodec.EncodeJson(PacketKind.Control, message), true, 0);
+    private void SendControl(int target, SessionMessage message)
+    {
+        if(message.Kind is "lobby" or "start" or "results" or "roster")
+            message=message with{Mode=gameMode,Campaign=campaign?.View(),SessionId=raceSessionId};
+        Send(target,PacketCodec.EncodeJson(PacketKind.Control,message),true,0);
+    }
     private void Send(int target, byte[] packet, bool reliable, int channel)
     {
         if (transport is null) return;
@@ -157,8 +165,8 @@ public partial class Main
             r.NetworkState = state; r.Car.Health = state.Health; r.Energy = state.Energy; r.Heat = state.Heat;
             if (state.Id == localId)
             {
-                if (!r.Overheated && state.Heat >= 95) { r.Overheated = true; ui.Notice("LASER PRZEGRZANY", 2); }
-                else if (r.Overheated && state.Heat < 30) { r.Overheated = false; ui.Notice("LASER GOTOWY", 2); }
+                if (!r.Overheated && state.Heat >= r.Build.Primary.OverheatThreshold) { r.Overheated = true; ui.Notice("LASER PRZEGRZANY", 2); }
+                else if (r.Overheated && state.Heat < r.Build.Primary.OverheatResume) { r.Overheated = false; ui.Notice("LASER GOTOWY", 2); }
             }
             r.Ammo = state.Ammo; r.Mines = state.Mines; r.Respawn = state.Respawn; r.Invulnerable = state.Invulnerability;
             r.Car.Invulnerability = state.Invulnerability; r.Car.MovementScale = state.SlowRemaining > 0 ? state.SlowFactor : 1;
@@ -200,6 +208,6 @@ public partial class Main
             });
         }
         catch { status = "UPnP niedostępne. Połączenia LAN nadal działają."; }
-        if (IsInsideTree() && inSession && isHost) ui.Notice(status, 10);
+        if (IsInsideTree() && inSession && isHost) { ui.ConnectionStatus(status);ui.Notice(status, 10); }
     }
 }

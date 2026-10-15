@@ -1,7 +1,8 @@
-param([switch]$Impaired, [switch]$Combat, [switch]$Dedicated, [ValidateRange(1,7)][int]$Clients = 1, [int]$Port = 29847, [ValidateRange(1,3)][int]$Rounds = 1, [switch]$SkipBuild)
+param([switch]$Impaired, [switch]$Combat, [switch]$Dedicated, [switch]$Campaign, [ValidateRange(1,7)][int]$Clients = 1, [int]$Port = 29847, [ValidateRange(1,3)][int]$Rounds = 1, [switch]$SkipBuild)
 . "$PSScriptRoot/common.ps1"
 if (!$SkipBuild) { & "$PSScriptRoot/build.ps1" }
 $engine = Get-Godot
+if ($Campaign) { $Rounds = 3 }
 $testRoot = Join-Path $RepoRoot ('artifacts/tests/' + [guid]::NewGuid().ToString('N').Substring(0,8))
 New-Item -ItemType Directory -Force $testRoot | Out-Null
 $processes = @()
@@ -14,6 +15,7 @@ function Start-GameProcess([string]$name, [string[]]$extra) {
     $info.RedirectStandardError = $true
     $info.StandardOutputEncoding = [System.Text.Encoding]::UTF8; $info.StandardErrorEncoding = [System.Text.Encoding]::UTF8
     $allArgs = @('--headless','--path',(Join-Path $RepoRoot 'src/Game.Client'),'--log-file',"$testRoot/$name.engine.log",'--max-fps','60','--','--smoke',"--port=$Port", "--rounds=$Rounds", "--timeout=$(210 * $Rounds)","--name=$name", "--results=$testRoot/$name.json") + $extra
+    if ($Campaign) { $allArgs += @('--mode=campaign','--campaign-races=3',"--profile-path=$testRoot/$name.profile.json") }
     if (!$Combat) { $allArgs += '--no-weapons' }
     if ($Impaired) { $allArgs += @('--latency=50','--loss=0.03') }
     foreach ($argument in $allArgs) { $info.ArgumentList.Add($argument) }
@@ -50,6 +52,7 @@ try {
             $clientCar = $clientReport.vehicles | Where-Object id -EQ $car.id
             if ($clientCar.passed -ne $car.passed -or $clientCar.finish -ne $car.finish) { throw "Niezgodny wynik auta $($car.id)" }
         }
+        if ($Campaign -and (!$clientReport.campaign.complete -or $clientReport.campaign.id -ne $hostReport.campaign.id -or $clientReport.profileRaces -ne 3 -or $clientReport.profileCampaigns -ne 1 -or $clientReport.coins -le 0)) { throw 'Niezgodny rozwój kampanii lub nagrody.' }
         if ($clientReport.rounds.Count -ne $Rounds) { throw 'Nie wykonano wszystkich rewanżów.' }
         foreach ($property in $hostReport.events.psobject.Properties) {
             if ($clientReport.events.($property.Name) -ne $property.Value) { throw "Niezgodna liczba zdarzeń: $($property.Name)" }

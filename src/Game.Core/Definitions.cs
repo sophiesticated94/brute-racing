@@ -28,7 +28,9 @@ public sealed class GameCatalog
     public Dictionary<string, WeaponDefinition> Weapons { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, WeaponDefinition[]> WeaponLevels { get; } = new(StringComparer.Ordinal);
     public SkillGraph Skills { get; private set; } = new([]);
-    public static string[] Files => ["cars/rook.json", "weapons/weapons.json", "tracks/cinder.json", "skills/skills.json"];
+    public EconomyDefinition Economy { get; private set; } = new();
+    public Dictionary<string,CosmeticDefinition> Cosmetics {get;} = new(StringComparer.Ordinal);
+    public static string[] Files => ["cars/rook.json", "weapons/weapons.json", "tracks/cinder.json", "skills/skills.json", "rules/economy.json", "cosmetics/catalog.json"];
     public TrackDefinition Track { get; private set; } = null!;
 
     public static GameCatalog Load(Func<string, string> read)
@@ -54,6 +56,16 @@ public sealed class GameCatalog
             catalog.Track.Width < 6 || catalog.Track.RadiusX <= catalog.Track.Width || catalog.Track.RadiusZ <= catalog.Track.Width || catalog.Track.Laps < 1)
             throw new InvalidDataException("Nieprawidłowa definicja toru.");
         catalog.Skills = new(JsonSerializer.Deserialize<SkillNodeDefinition[]>(read("skills/skills.json"),Json)!);
+        catalog.Economy = JsonSerializer.Deserialize<EconomyDefinition>(read("rules/economy.json"),Json)!;
+        if(catalog.Economy.XpPerLevel<=0 || catalog.Economy.SkillPointsPerLevel!=6 || catalog.Economy.BaseCredits<0 || catalog.Economy.CreditsRoundStep<0 || catalog.Economy.CampaignCoins<0)
+            throw new InvalidDataException("Nieprawidłowa ekonomia.");
+        foreach(var item in JsonSerializer.Deserialize<CosmeticDefinition[]>(read("cosmetics/catalog.json"),Json)!)
+        {
+            if(string.IsNullOrWhiteSpace(item.Id) || item.Price<0 || !new[]{"stock","stripe","hood","checker","trail"}.Contains(item.Type) ||
+                !System.Text.RegularExpressions.Regex.IsMatch(item.Color??"","^[0-9a-fA-F]{6}$")) throw new InvalidDataException("Nieprawidłowa kosmetyka.");
+            catalog.Cosmetics.Add(item.Id,item);
+        }
+        if(!catalog.Cosmetics.ContainsKey("stock"))throw new InvalidDataException("Brak fabrycznej kosmetyki.");
         return catalog;
     }
 }

@@ -39,7 +39,8 @@ public sealed record LobbyPlayer(int Id, string Name, int Color, bool Ready, boo
 public sealed record SessionMessage(string Kind, int Protocol = 2, string ContentHash = "",
     string Name = "", int Color = 0, PlayerLoadoutDto? Loadout = null,
     LobbyPlayer[]? Players = null, string Message = "", int[]? Ranking = null, uint RaceId = 0, double SentTime = 0,
-    LobbyBalanceRules? BalanceRules = null);
+    LobbyBalanceRules? BalanceRules = null, GameMode Mode = GameMode.Exhibition,
+    CampaignView? Campaign = null, Guid SessionId = default, RewardReceipt? Reward = null, string ItemId = "", string CosmeticId = "stock");
 
 public interface INetworkTransport : IDisposable
 {
@@ -57,7 +58,7 @@ public interface INetworkTransport : IDisposable
 
 public static class PacketCodec
 {
-    public const int MaxPacketBytes = 16384;
+    public const int MaxPacketBytes = 32768;
     public static byte[] EncodeInputs(IReadOnlyList<PlayerInputCommand> commands)
     {
         if (commands.Count is < 1 or > 3) throw new ArgumentOutOfRangeException(nameof(commands));

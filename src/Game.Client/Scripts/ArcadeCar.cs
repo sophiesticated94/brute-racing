@@ -27,6 +27,15 @@ public partial class ArcadeCar : RigidBody3D
     private readonly List<MeshInstance3D> wheels = [];
     private double smokeTime;
     private double skidTime;
+    private CosmeticDefinition? cosmetic;
+    private double trailTime;
+    public void ApplyCosmetic(CosmeticDefinition value)
+    {
+        cosmetic=value;var color=new Color(value.Color);
+        if(value.Type=="stripe")foreach(float x in new[]{-.43f,.43f})Art.Box(Visual,new(.22f,.02f,3.45f),new(x,.305f,0),color);
+        if(value.Type=="hood")Art.Box(Visual,new(1.65f,.02f,1.05f),new(0,.305f,-1.13f),color);
+        if(value.Type=="checker")for(int x=0;x<6;x++)for(int z=0;z<4;z++)if((x+z)%2==0)Art.Box(Visual,new(.22f,.02f,.22f),new(-.65f+x*.25f,.306f,-1.6f+z*.24f),color);
+    }
     private float stuckTime;
     private Vector3? resetPosition;
     private Quaternion resetRotation;
@@ -156,6 +165,9 @@ public partial class ArcadeCar : RigidBody3D
         turret.Rotation = new(0, Mathf.Wrap(TurretYaw - bodyYaw, -Mathf.Pi, Mathf.Pi), 0);
         bool visible = Health > 0 && (Invulnerability <= 0 || (Time.GetTicksMsec() / 95) % 2 == 0);
         Visual.Visible = visible;
+        trailTime-=delta;
+        if(cosmetic?.Type=="trail" && visible && Driving && LinearVelocity.Length()>8 && trailTime<=0 && DisplayServer.GetName()!="headless")
+        {trailTime=.08;var mark=Art.Box(GetParent<Node3D>(),new(.28f,.08f,.7f),GlobalTransform*new Vector3(0,-.5f,2),new(cosmetic.Color),true);var fade=mark.CreateTween();fade.TweenProperty(mark,"scale",Vector3.Zero,.6);fade.TweenCallback(Callable.From(mark.QueueFree));}
         skidTime -= delta;
         if (Driving && Grounded && Health > 0 && skidTime <= 0 && (Command.Handbrake || Mathf.Abs(LinearVelocity.Dot(GlobalBasis.X)) > 3) && LinearVelocity.Length() > 5)
         {
