@@ -123,4 +123,3 @@ public partial class Main
         return valid;
     }
 }
-

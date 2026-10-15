@@ -44,7 +44,8 @@ public partial class Main
         if (car.LinearVelocity.Length() < 1.4f && (r.Info.Bot || autoPlay)) r.Unstuck += dt; else r.Unstuck = 0;
         if (r.Unstuck > 4)
         {
-            r.Unstuck = 0; car.ResetAt(track.GatePoint(r.Progress.LastCheckpoint) + track.GateDirection(r.Progress.LastCheckpoint) * 2 + Vector3.Up, track.YawAt(r.Progress.LastCheckpoint));
+            r.Unstuck = 0;var rescue=track.GatePoint(r.Progress.LastCheckpoint) + track.GateDirection(r.Progress.LastCheckpoint) * 2 + Vector3.Up;car.ResetAt(rescue, track.YawAt(r.Progress.LastCheckpoint));
+            Emit("teleport",r.Info.Id,0,rescue,Vector3.Zero);
         }
         if (noWeapons) return;
         if (car.Command.Fire && r.PrimaryCooldown <= 0 && !r.Overheated) Fire(r);

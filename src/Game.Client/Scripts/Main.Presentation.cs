@@ -77,7 +77,15 @@ public partial class Main
                 }
             }
         }
-        else if (e.Kind == "respawn") Art.Burst(effects, p, new("62dce0"), 1.2f);
+        else if (e.Kind is "respawn" or "teleport")
+        {
+            if(racers.TryGetValue(e.Actor,out var reset))
+            {
+                reset.History.Clear();reset.Car.VisualOffset=Vector3.Zero;reset.Car.HardResetPending=true;
+                if(e.Actor==localId){pending.Clear();recentInputs.Clear();}
+            }
+            if(e.Kind=="respawn")Art.Burst(effects,p,new("62dce0"),1.2f);
+        }
         else if (e.Kind == "checkpoint" && e.Actor == localId)
         {
             audio.PlayAt("checkpoint", p);

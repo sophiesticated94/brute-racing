@@ -1,5 +1,7 @@
 # Mini Car Mayhem 3D
 
+[![Build and race](https://github.com/sophiesticated94/brute-racing/actions/workflows/ci.yml/badge.svg)](https://github.com/sophiesticated94/brute-racing/actions/workflows/ci.yml)
+
 Autorska wyścigowa gra bojowa: Godot **4.7 .NET**, **Jolt**, C#. Jeden tor 3D,
 samochód Rook w ośmiu kolorach, karabin, laser, rakiety, miny i do siedmiu rywali.
 Kampania pokoju, rozwój w garażu i szybki multiplayer dobierany według siły archiwalnego buildu.

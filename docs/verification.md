@@ -19,11 +19,12 @@ Godot 4.7 .NET / Jolt, SDK 10.0.400, Windows, eksport Linux sprawdzony w Ubuntu/
 | Kontener ASP.NET Core 10 | Build i uruchomienie jako non-root, health/protokół/hash — PASS | `docker build -f src/Game.DirectoryApi/Dockerfile ...` |
 | Eksport Windows | Pełny wyścig, 8 aut, poziom 5 i archetypy — PASS | eksport `--headless --fixed-fps 60 -- --smoke --bots=7 --balance=open --weapon-level=5 --mine-level=5` |
 | Eksport Linux / WSL | Pełny wyścig i podium, 8 aut, poziom 5 — PASS | te same flagi, Linux binary |
-| Render 1280×800 na RTX 4050 Laptop, 8 rozbudowanych aut | 59,6 FPS średnio przy limicie 60 | czas rzeczywisty, bez fixed-fps |
+| Render 1280×800 na RTX 4050 Laptop, 8 rozbudowanych aut | 59,8 FPS średnio przy limicie 60 (izolowany bieg) | czas rzeczywisty, bez fixed-fps |
 | Garaż i HUD | Sprawdzone zrzuty rzeczywistego renderera, polskie nazwy i DAG | `--garage-preview --screenshot=...` / wyścig |
 
-Podczas testu renderowania działały także procesy weryfikacyjne. Najdłuższa klatka
-trwała 338 ms, więc średnia nie oznacza braku przycięć. `--fixed-fps` przyspiesza
+W izolowanym biegu renderowania najdłuższa klatka trwała 104 ms; wcześniejszy
+bieg równoległy z weryfikacją osiągnął 59,6 FPS i 338 ms. Średnia nie oznacza
+braku pojedynczych przycięć. `--fixed-fps` przyspiesza
 testy logiki i nie służy do mierzenia płynności. Mocne buildy nadal mogą nie
 ukończyć wyścigu przed 30-sekundowym limitem po pierwszej mecie; końcowa
 klasyfikacja poprawnie uwzględnia wtedy postęp. W renderowanym biegu wszystkie
@@ -43,4 +44,7 @@ renderowanie i dźwięk sprawdzono na Windows. Predykcja jest przybliżonym repl
 wejść; kolizje i eksplozje pozostają autorytatywne i mogą powodować twarde korekty.
 Nie ma relaya, migracji hosta ani dowodu historycznego zdobycia archiwalnego buildu.
 
-Status pierwszego GitHub Actions zostanie dopisany po publikacji repozytorium.
+Publiczne repozytorium: [sophiesticated94/brute-racing](https://github.com/sophiesticated94/brute-racing).
+Aktualny wynik pełnej weryfikacji i paczki gry: [GitHub Actions](https://github.com/sophiesticated94/brute-racing/actions/workflows/ci.yml).
+CI buduje domenę, klienta, katalog i kontener, wykonuje 48 testów, rzeczywiste
+wyścigi ENet, kampanię, quick, rozłączenia, osiem procesów oraz eksporty i Linux smoke.
