@@ -120,6 +120,7 @@ public partial class Main
         if (lastFrameUsec > 0)
         {
             double wallDt = (frameUsec - lastFrameUsec) / 1000000.0;
+            runtimeMetrics.Frame(wallDt,Performance.GetMonitor(Performance.Monitor.TimePhysicsProcess),GetTree().GetNodeCount(),(int)Performance.GetMonitor(Performance.Monitor.Physics3DActiveObjects),ordnance.Count,effects.GetChildCount());
             wallFrameTotal += wallDt; wallWorstFrame = Math.Max(wallWorstFrame, wallDt);
         }
         lastFrameUsec = frameUsec;

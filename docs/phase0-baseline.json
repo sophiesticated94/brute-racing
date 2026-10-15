@@ -1,0 +1,41 @@
+{
+  "success": true,
+  "averageFps": 59.84176132349392,
+  "worstFrameMs": 99.107,
+  "runtimeMetrics": {
+    "warmupSeconds": 3,
+    "frame": {
+      "samples": 4315,
+      "meanMs": 16.695700347624527,
+      "p95Ms": 17.532,
+      "p99Ms": 18.884,
+      "maxMs": 67.588
+    },
+    "enginePhysics": {
+      "samples": 4315,
+      "meanMs": 5.5336600231750275,
+      "p95Ms": 22.241,
+      "p99Ms": 51.645,
+      "maxMs": 51.645
+    },
+    "sessionTick": {
+      "samples": 4322,
+      "meanMs": 0.45152353077279045,
+      "p95Ms": 1.1012000000000002,
+      "p99Ms": 2.0040999999999998,
+      "maxMs": 35.4763
+    },
+    "managedAllocatedBytes": 96132616,
+    "managedBytesPerSecond": 1281234.9804176153,
+    "peakNodes": 2482,
+    "peakBodies": 0,
+    "peakProjectiles": 12,
+    "peakEffects": 171
+  },
+  "meanCorrection": 0,
+  "maxCorrection": 0,
+  "hardCorrections": 0,
+  "source": "b4c349b + instrumentation only",
+  "hardware": "RTX 4050 Laptop, 1280x800, OpenGL Compatibility",
+  "scenario": "8 cars, OpenMayhem, level-5 weapons, real time / 60 FPS cap"
+}

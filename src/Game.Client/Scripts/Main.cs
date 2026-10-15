@@ -93,6 +93,7 @@ public partial class Main : Node3D
     private float correctionMax;
     private int correctionCount, hardCorrections;
     private readonly NetworkDiagnostics diagnostics = new();
+    private readonly RuntimeMetrics runtimeMetrics=new();
     private double nextPing;
     private double shakeTime;
     private MeshInstance3D? aimLine;
@@ -265,6 +266,11 @@ public partial class Main : Node3D
     }
     public override void _PhysicsProcess(double delta)
     {
+        long started=System.Diagnostics.Stopwatch.GetTimestamp();
+        try{PhysicsTick(delta);}finally{runtimeMetrics.Tick(System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalSeconds);}
+    }
+    private void PhysicsTick(double delta)
+    {
         if (catalog is null) return;
         now += delta; transport?.Poll(); FlushDelayed();UpdateQuick();
         if (inSession && !isHost && transport is not null && now >= nextPing)
@@ -379,7 +385,7 @@ public partial class Main : Node3D
         var report = new
         {
             success, host = isHost, localId, tick, mode=gameMode.ToString(), campaign=campaign?.View()??campaignView, coins=profile.Coins, profileRaces=profile.CompletedRaces, profileCampaigns=profile.CompletedCampaigns, phase = phase.ToString(), elapsed = raceElapsed,
-            ranking = Ranking(), receivedSnapshots, shots, destructions, checkpointPasses, rejectedBuilds,
+            runtimeMetrics=runtimeMetrics.Report(),ranking = Ranking(), receivedSnapshots, shots, destructions, checkpointPasses, rejectedBuilds,
             simulatedFps = frameTotal > 0 ? frameCount / frameTotal : 0,
             averageFps = wallFrameTotal > 0 ? (frameCount - 1) / wallFrameTotal : 0, worstFrameMs = wallWorstFrame * 1000,
             rounds = roundReports, events = eventCounts,
