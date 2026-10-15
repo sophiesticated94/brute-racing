@@ -35,9 +35,11 @@ public partial class GameUi : CanvasLayer
     private Button start = null!, replay = null!, ready = null!;
     private Label notice = null!;
     private double noticeTime;
-    private OptionButton balanceOption = null!;
+    private OptionButton balanceOption = null!,lobbyWeapon = null!,lobbyPaint=null!;
     public event Action<LobbyBalanceMode>? BalanceChanged;
     public void ShowBalance(LobbyBalanceRules rules, bool host) { balanceOption.Select((int)rules.Mode); balanceOption.Disabled = !host; }
+    private GameCatalog catalog=null!;
+    public void ConfigureCatalog(GameCatalog value)=>catalog=value;
     private RaceMap map = null!;
     private AimReticle reticle = null!;
     public void HitMarker() => reticle.Hit();
@@ -51,8 +53,8 @@ public partial class GameUi : CanvasLayer
         var brand = new Label { Text = "MCM  /  MOTORSPORT DIVISION", Position = new(38, 24) }; Font(brand, 18, Accent); root.AddChild(brand);
         var build = new Label { Text = "VOL. 01   •   CINDER CIRCUIT", AnchorLeft = 1, AnchorRight = 1, OffsetLeft = -340, OffsetTop = 26, OffsetRight = -32, OffsetBottom = 60, HorizontalAlignment = HorizontalAlignment.Right };
         Font(build, 14, Muted); root.AddChild(build);
-        menu = Card(new(38, 87), new(445, 694));
-        var menuScroll=new ScrollContainer{CustomMinimumSize=new(395,645)};menu.AddChild(menuScroll);
+        menu = Card(new(38, 87), new(445, 650));
+        var menuScroll=new ScrollContainer{CustomMinimumSize=new(395,600)};menu.AddChild(menuScroll);
         var m = Stack(menuScroll);m.CustomMinimumSize=new(375,0);m.SizeFlagsHorizontal=Control.SizeFlags.ExpandFill;
         AddText(m, "MINI CAR\nMAYHEM", 57, Ink);
         AddText(m, "MAŁE AUTA. DUŻY CHAOS.", 16, Accent);
@@ -72,6 +74,9 @@ public partial class GameUi : CanvasLayer
         var connection = new HBoxContainer(); m.AddChild(connection);
         Address = new LineEdit { Text = "127.0.0.1", PlaceholderText = "Adres IP hosta", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; connection.AddChild(Address);
         Port = new SpinBox { MinValue = 1024, MaxValue = 65535, Value = 28747, CustomMinimumSize = new(120, 0) }; connection.AddChild(Port);
+        var codes=new HBoxContainer();m.AddChild(codes);
+        AddButton(codes,"KOPIUJ KOD IP:PORT",()=>{try{DisplayServer.ClipboardSet(ConnectionCode.Encode(Address.Text,(int)Port.Value));Notice("Skopiowano kod połączenia.");}catch(ArgumentException e){Notice(e.Message);}});
+        AddButton(codes,"WKLEJ KOD",()=>{if(ConnectionCode.TryDecode(DisplayServer.ClipboardGet(),out string ip,out int port)){Address.Text=ip;Port.Value=port;Notice("Wklejono adres połączenia.");}else Notice("Nieprawidłowy kod połączenia.");});
         Internet = new CheckBox { Text = "Host internetowy · spróbuj UPnP" }; m.AddChild(Internet);
         var network = new HBoxContainer(); m.AddChild(network);
         AddButton(network, "HOST KAMPANII", () => HostRequested?.Invoke());
@@ -84,8 +89,8 @@ public partial class GameUi : CanvasLayer
         balanceOption = new OptionButton(); foreach (var mode in new[] { "Stock · 0 SP / poz. 1", "FairCap · 15 SP / poz. 3", "OpenMayhem · 30 SP / poz. 5" }) balanceOption.AddItem(mode);
         l.AddChild(balanceOption); balanceOption.ItemSelected += index => BalanceChanged?.Invoke((LobbyBalanceMode)index);
         AddText(l, "ROOK  /  wybierz uzbrojenie i lakier", 15, Muted);
-        var lobbyWeapon = new OptionButton(); foreach (string w in new[] { "Karabin", "Laser", "Rakiety" }) lobbyWeapon.AddItem(w); l.AddChild(lobbyWeapon);
-        var lobbyPaint = new OptionButton(); foreach (string c in new[] { "Bursztyn", "Turkus", "Koral", "Lawenda", "Limonka", "Kość słoniowa", "Pomarańcz", "Kobalt" }) lobbyPaint.AddItem(c); l.AddChild(lobbyPaint);
+        lobbyWeapon = new OptionButton(); foreach (string w in new[] { "Karabin", "Laser", "Rakiety" }) lobbyWeapon.AddItem(w); l.AddChild(lobbyWeapon);
+        lobbyPaint = new OptionButton(); foreach (string c in new[] { "Bursztyn", "Turkus", "Koral", "Lawenda", "Limonka", "Kość słoniowa", "Pomarańcz", "Kobalt" }) lobbyPaint.AddItem(c); l.AddChild(lobbyPaint);
         lobbyWeapon.ItemSelected += index => { Weapon.Select((int)index); LoadoutChanged?.Invoke(); };
         lobbyPaint.ItemSelected += index => { Paint.Select((int)index); LoadoutChanged?.Invoke(); };
         lobby.VisibilityChanged += () => { lobbyWeapon.Select(Weapon.Selected); lobbyPaint.Select(Paint.Selected); };
@@ -134,8 +139,10 @@ public partial class GameUi : CanvasLayer
     public void ShowLobby(LobbyPlayer[] players, bool isHost, int local)
     {
         menu.Visible = false; lobby.Visible = true; hud.Visible = podium.Visible = pause.Visible = false;
-        lobbyList.Text = string.Join("\n", players.Select((p, i) => $"{i+1:00} {p.Name[..Math.Min(12,p.Name.Length)]}{(p.Id==local?" ◂":"")} {(p.Bot?"AI":p.Ready?"✓":"…")}  W{p.Loadout.WeaponLevel} M{p.Loadout.MineLevel}"));
-        start.Visible = isHost; start.Disabled = players.Length < 2 || players.Any(p => !p.Ready);
+        var own=players.FirstOrDefault(p=>p.Id==local);
+        if(own is not null){Weapon.Select(own.Loadout.WeaponId=="laser"?1:own.Loadout.WeaponId=="rocket"?2:0);lobbyWeapon.Select(Weapon.Selected);lobbyPaint.Select(own.Color);}
+        lobbyList.Text = string.Join("\n", players.Select((p, i) => $"{i+1:00} {p.Name[..Math.Min(12,p.Name.Length)]}{(p.Id==local?" ◂":"")} {(p.Bot?"AI":p.Ready?"✓":"…")}  W{p.Loadout.WeaponLevel} M{p.Loadout.MineLevel} {catalog.Skills.Cost(p.Loadout.SkillRanks)}SP"));
+        start.Visible = isHost; start.Disabled = players.Length == 0 || players.Any(p => !p.Ready);
         ready.Text = players.FirstOrDefault(p => p.Id == local)?.Ready == true ? "GOTOWY ✓  /  ZMIEŃ" : "ZGŁOŚ GOTOWOŚĆ";
     }
     public void ShowRace() { menu.Visible = lobby.Visible = podium.Visible = pause.Visible = false; hud.Visible = true; }

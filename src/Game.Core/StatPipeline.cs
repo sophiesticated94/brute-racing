@@ -37,7 +37,13 @@ public static class StatLimits
     {
         if (string.IsNullOrWhiteSpace(weapon.Id) || weapon.UpgradeCost < 0 || weapon.Damage <= 0 || weapon.FireRate <= 0 || weapon.Range <= 0 || weapon.AmmoCapacity < 0 || weapon.EnergyConsumption < 0)
             throw new InvalidDataException("Nieprawidłowa definicja broni.");
-        foreach (var p in NumericProperties(typeof(WeaponDefinition))) Clamp(p.Name, Convert.ToSingle(p.GetValue(weapon)));
+        if(weapon.Level is <1 or >5 || ((int)weapon.Perks & ~31)!=0 || weapon.OverheatResume>=weapon.OverheatThreshold)throw new InvalidDataException("Nieprawidłowe mechaniki broni.");
+        ValidateNumbers(weapon);
+    }
+    public static void ValidateNumbers<T>(T definition) where T:class
+    {
+        foreach(var p in NumericProperties(typeof(T)))
+        {float value=Convert.ToSingle(p.GetValue(definition));if(Clamp(p.Name,value)!=value)throw new InvalidDataException($"Definicja poza ograniczeniami: {p.Name}");}
     }
     private static IEnumerable<PropertyInfo> NumericProperties(Type type) => type.GetProperties().Where(p =>
         (p.PropertyType == typeof(float) || p.PropertyType == typeof(int)) && p.Name is not "Level" and not "UpgradeCost");

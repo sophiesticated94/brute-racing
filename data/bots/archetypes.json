@@ -1,0 +1,107 @@
+[
+  {
+    "id": "speedster",
+    "name": "Sprinter",
+    "loadout": {
+      "carId": "rook",
+      "weaponId": "machine_gun",
+      "weaponLevel": 5,
+      "skillRanks": {
+        "drive_accel": 3,
+        "drive_speed": 3,
+        "drive_grip": 3,
+        "drive_drift": 3,
+        "drive_mass": 3,
+        "drive_boost": 1,
+        "ballistics_traverse": 2
+      },
+      "mineLevel": 5,
+      "playerLevel": 6,
+      "cosmeticId": "stock"
+    }
+  },
+  {
+    "id": "laser_cooling",
+    "name": "Chłodny laser",
+    "loadout": {
+      "carId": "rook",
+      "weaponId": "laser",
+      "weaponLevel": 5,
+      "skillRanks": {
+        "energy_efficiency": 3,
+        "energy_cooling": 3,
+        "energy_heat": 3,
+        "energy_resume": 3,
+        "energy_regen": 3,
+        "energy_radiators": 1,
+        "defense_health": 2
+      },
+      "mineLevel": 5,
+      "playerLevel": 6,
+      "cosmeticId": "stock"
+    }
+  },
+  {
+    "id": "rocket_bruiser",
+    "name": "Rakietowy osiłek",
+    "loadout": {
+      "carId": "rook",
+      "weaponId": "rocket",
+      "weaponLevel": 5,
+      "skillRanks": {
+        "ballistics_traverse": 3,
+        "ballistics_rate": 3,
+        "ballistics_ammo": 3,
+        "ballistics_projectile": 3,
+        "ballistics_reclaim": 3,
+        "ballistics_pierce": 1,
+        "defense_health": 2
+      },
+      "mineLevel": 5,
+      "playerLevel": 6,
+      "cosmeticId": "stock"
+    }
+  },
+  {
+    "id": "mine_saboteur",
+    "name": "Minowy sabotażysta",
+    "loadout": {
+      "carId": "rook",
+      "weaponId": "machine_gun",
+      "weaponLevel": 5,
+      "skillRanks": {
+        "sabotage_damage": 3,
+        "sabotage_radius": 3,
+        "sabotage_capacity": 3,
+        "sabotage_arming": 3,
+        "sabotage_emp": 3,
+        "sabotage_emergency": 1,
+        "defense_health": 2
+      },
+      "mineLevel": 5,
+      "playerLevel": 6,
+      "cosmeticId": "stock"
+    }
+  },
+  {
+    "id": "tank",
+    "name": "Czołg",
+    "loadout": {
+      "carId": "rook",
+      "weaponId": "laser",
+      "weaponLevel": 5,
+      "skillRanks": {
+        "defense_health": 3,
+        "defense_armor": 3,
+        "defense_resist": 3,
+        "defense_protection": 3,
+        "defense_delay": 3,
+        "defense_regen": 1,
+        "drive_accel": 2
+      },
+      "mineLevel": 5,
+      "playerLevel": 6,
+      "cosmeticId": "stock"
+    }
+  }
+]

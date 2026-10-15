@@ -1,51 +1,77 @@
-# Architektura grywalnego rdzenia
+# Architektura
 
-## Granice
+## Projekty i dane
 
-`Game.Core` celuje w net8.0, bez Godota, aby działać w runtime desktopowym silnika.
-SDK rozwiązania jest przypięty do .NET 10.0.400; testy celują w net10.0. Dodatkowy
-`Game.Client.sln` jest wymagany przez eksporter C# Godota. W przyszłości
-`Game.DirectoryApi` może niezależnie celować w net10.0.
+SDK .NET 10.0.400 jest przypięty w `global.json`; Godot.NET.Sdk 4.7.0 w kliencie.
+Core i klient celują w net8.0 ze względu na runtime Godota. Katalog i testy celują
+w net10.0. `Game.Client.sln` służy eksporterowi Godota. Główne rozwiązanie buduje
+wszystkie projekty. `data/` jest źródłem prawdy; build kopiuje JSON do klienta
+oraz wyjścia/publikacji API. Walidacja startupu obejmuje liczby skończone, limity,
+poziomy 1–5, 30 węzłów DAG, ekonomię, kosmetyki, fitness i pięć archetypów.
 
-`GameCatalog` ładuje dane i odrzuca nieprawidłowe definicje. `BuildValidator`
-akceptuje tylko istniejący samochód, jedną z trzech broni głównych na poziomie 1
-i pusty przydział umiejętności. `VehicleStatsCalculator` jest jedynym miejscem
-wyprowadzania statystyk; klient nigdy nie deklaruje ich wartości.
+`Game.Core` nie zależy od Godota. `VehicleStatsCalculator.CalculateBuild` zwraca
+auto, broń główną, miny i parametry mechanik. Kolejność to baza → wyposażenie →
+suma Add → Multiply → Override → centralne ograniczenia. Efekty są stabilnie
+sortowane według priorytetu i ID źródła; ostatni Override wygrywa. Efekt rangi
+opisuje jej pełny wynik, nie sumuje się z poprzednimi rangami.
 
-## Świat i fizyka
+`SkillGraph` waliduje DAG i tworzy porządek topologiczny z rozstrzyganiem ID ordinal.
+`BuildValidator` odrzuca uszkodzone deklaracje przed normalizacją. FairCap na
+kopii ogranicza broń do 3, następnie odejmuje rangi od końca porządku aż do 15 SP.
+OpenMayhem dopuszcza 30 SP / poziom broni 5, Stock 0 SP / 1. Budżet poziomu gracza
+również obowiązuje. `LoadoutDeclaration` ma adapter starego `PlayerLoadoutDto`.
 
-`RaceTrack` tworzy zamknięty tor z segmentów, widoczną siatkę, kolizje, rampę,
-strefę obniżonej przyczepności i 12 kierunkowych obszarów checkpointów. Objętości
-Area3D pozostają w scenie; zaliczenie wymaga przecięcia płaszczyzny bramki we
-właściwym kierunku, szerokości i wysokości. Test geometrii działa w `Game.Core`,
-bez wczesnych kontaktów zderzaka i bez zaliczania teleportacji.
-`ArcadeCar` jest RigidBody3D z czterema promieniami zawieszenia. Siły działają
-w `_IntegrateForces`; ciąg, tłumienie boczne i skręt zależą od danych.
-Stabilizacja oraz automatyczne odwrócenie pomagają po wybuchach.
+## Świat i prowadzenie
 
-Warstwy: 1 — tor, 2 — auta, 4 — auta chronione. Chronione auta nadal zaliczają
-bramki, ale nie zderzają się z innymi pojazdami. Efekty wizualne i markery broni
-są dziećmi osobnego korzenia modelu, który można przesunąć podczas korekty ruchu.
+`RaceTrack` generuje autorski kanion, bandy, rampę, oznakowanie i śliską strefę.
+Kierunkowe checkpointy wymagają rzeczywistego przecięcia płaszczyzny w szerokości
+i wysokości bramki. Area3D zachowują geometrię, ale nie monitorują kontaktów.
+`ArcadeCar` to RigidBody3D Jolt z czterema promieniami zawieszenia, sprężynami,
+tłumieniem, driftem i stabilizacją. `MovementTuning` współdzieli parametry z
+przybliżoną predykcją. Kamera zachowuje orientację świata, śledzi prędkość i
+lekko kierunek celowania. Model wizualny ma osobny offset korekty.
 
-## Sesja
+Warstwy: tor 1, auta 2, auta chronione 4. Ochrona wyłącza kolizje między autami.
+Boty i gracze produkują ten sam `PlayerInputCommand`. Boty mają pięć poprawnych
+archetypów; reguły lobby normalizują ich buildy. Kampania resetuje je do bazy,
+a potem boty kupują rozwój zgodnie z wybraną specjalizacją.
 
-`Main` składa scenę i zarządza stanami Lobby → Countdown → Racing → Podium.
-Świat i kod sesji są identyczne dla hosta grającego oraz headless. Host wywołuje
-czystą logikę `RaceProgress`, `RaceClock` i `RaceRanking` z wejściami fizyki.
-Pierwszy finisz rozpoczyna 30-sekundowe zamknięcie mety; ukończenie przez wszystkich
-kończy wyścig wcześniej. Po wyścigu host może uruchomić nowy z tym samym składem.
+## Sesja i walka
 
-Boty produkują `PlayerInputCommand`, podobnie jak klawiatura i pad. Nie teleportują
-się do przodu w rankingu. Jeśli utkwią, wracają do ostatniej zaliczonej bramki.
-Utrata klienta zamienia kierowcę w bota. Nie ma migracji hosta.
+`Main` składa scenę i stany Lobby → Countdown → Racing → Podium. Części klasy
+wydzielają sieć, walkę, mechaniki, wejście, celowanie, prezentację, walidację,
+progresję i quick. Ten sam kod obsługuje solo, listen host i serwer headless.
+Pierwsza meta uruchamia limit 30 s; pełny finisz kończy rundę wcześniej.
 
-## Walka i prezentacja
+Host rozlicza zasoby, obrażenia, cooldowny, impulsy, respawn i perki. Rakiety
+poruszają się w świecie 3D i testują cały odcinek ticku; pocisk przechowuje
+niezmienną definicję buildu z chwili wystrzelenia. Laser i karabin używają raycastów.
+Miny mają czas uzbrojenia i limit aktywnych sztuk; EMP spowalnia oraz zakłóca
+wieżyczkę. Mechaniki DAG obejmują impuls po drifcie, radiatory, odzysk amunicji,
+regenerację i awaryjną minę. Potwierdzone zdarzenia tworzą efekty/dźwięk, znaczniki
+trafień i liczby rzeczywiście odjętych HP. Assety i dźwięki są autorskie.
 
-Host sprawdza cooldowny, amunicję, energię, przegrzanie, raycasty, pociski, miny,
-obrażenia, impulsy i respawn. Rakiety korzystają z ciągłego testu odcinka ruchu
-w świecie fizyki, dzięki czemu nie przelatują przez cienkie przeszkody między tickami.
-Laser trafia aktualny świat hosta; nie ma historycznego cofania trafień.
+## Kampania i profil
 
-Zatwierdzone zdarzenia generują smugi, eksplozje, iskry i syntetyzowane dźwięki.
-Niski stan zdrowia emituje dym. Modele i środowisko powstają z autorskiej geometrii;
-gra nie korzysta z pobranych assetów ani nazw czy map referencyjnych gier.
+`CampaignState` przechowuje autorytatywny XP, poziom, własność wyposażenia, kredyty,
+SP i punkty mistrzostw każdego uczestnika. Klient wysyła intencję zakupu/rangi,
+a nie dowód własności. Ekonomia pochodzi z JSON: pierwszy zakup po pierwszej
+rundzie; XP skaluje się z długością kampanii. Nowa kampania tworzy nowy GUID i
+resetuje wszystkie parametry mechaniczne. Rozłączonego gracza przejmuje bot.
+
+`PlayerProfile` oddziela monety i kosmetyki od rozwoju kampanii. Ma trzy sloty
+archiwum oraz oczekujący końcowy build do świadomego zapisania w slocie. `ProfileRules`
+deduplikuje nagrody według GUID wyścigu/kampanii. `ProfileRepository` zapisuje
+atomowo z flush i kopią, a `ProfileCodec` waliduje wersję oraz SHA-256. Nowszy
+schemat jest tylko do odczytu; uszkodzony plik jest zachowany. Suma wykrywa
+uszkodzenia, nie jest zabezpieczeniem antycheat.
+
+## Opcjonalny katalog
+
+`Game.DirectoryApi` korzysta z tego samego Core i danych. `MatchQueue` przechowuje
+bilety, sekrety, oferty i heartbeat w pamięci pod blokadą. `TimeProvider` umożliwia
+testy terminów. Fitness powstaje z końcowych statystyk i perków, z jawnych wag.
+Katalog wybiera kandydata na hosta; Godot zestawia prawdziwy ENet i wszyscy
+potwierdzają gotowość oferty, zanim host dostanie zgodę na start. Błędy odnoszą
+się do GUID oferty, więc stara odpowiedź nie anuluje kolejnej próby.
+Nie ma bazy, kont, relaya ani domyślnego publicznego wdrożenia.

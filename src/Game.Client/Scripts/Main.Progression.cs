@@ -21,9 +21,11 @@ public partial class Main
             string file=arguments.GetValueOrDefault("profile-path",ProjectSettings.GlobalizePath("user://profile.json"));
             profileRepository=new(catalog,file);profile=profileRepository.Load(out string warning);if(warning.Length>0)ui.Notice(warning,10);
         }
+        if(arguments.TryGetValue("preset",out var preset))profile.SelectedPreset=Math.Clamp(int.Parse(preset)-1,0,2);
         ui.PlayerName.Text=profile.Name;ui.Paint.Select(profile.Paint);ui.UpdatePresets(profile);
         ui.DirectoryUrl.Text=System.Environment.GetEnvironmentVariable("MCM_DIRECTORY_URL")??"";
         garage=new GarageScreen();AddChild(garage);garage.Configure(catalog);garage.Command+=GarageCommand;
+        ui.QuickRequested+=StartQuick;ui.CancelQueueRequested+=()=>{CancelQuick();LeaveInternal();ui.ShowMenu();ui.Notice("Anulowano szukanie rywali.");};
         ui.GarageRequested+=OpenGarage;ui.PresetSelected+=slot=>SelectPreset(slot);
         if(gameMode==GameMode.Campaign)SetBalance(LobbyBalanceMode.OpenMayhem);
     }
@@ -33,9 +35,9 @@ public partial class Main
         catch(Exception e) when(e is IOException or UnauthorizedAccessException or InvalidDataException)
         {ui.Notice("Nie udało się zapisać profilu: "+e.Message,8);garage?.Notify("Nie udało się zapisać profilu.");}
     }
-    private void LaunchCampaignSolo(){gameMode=GameMode.Campaign;SetBalance(LobbyBalanceMode.OpenMayhem);StartSolo();}
-    private void LaunchCampaignHost(){gameMode=GameMode.Campaign;SetBalance(LobbyBalanceMode.OpenMayhem);StartHosting();}
-    private void LaunchCampaignJoin(){gameMode=GameMode.Campaign;JoinHost();}
+    private void LaunchCampaignSolo(){CancelQuick();gameMode=GameMode.Campaign;SetBalance(LobbyBalanceMode.OpenMayhem);StartSolo();}
+    private void LaunchCampaignHost(){CancelQuick();gameMode=GameMode.Campaign;SetBalance(LobbyBalanceMode.OpenMayhem);StartHosting();}
+    private void LaunchCampaignJoin(){CancelQuick();gameMode=GameMode.Campaign;JoinHost();}
     private void EnsureCampaign()
     {
         if(gameMode!=GameMode.Campaign || campaign is not null)return;
@@ -55,13 +57,14 @@ public partial class Main
     private GarageContext GarageContext()
     {
         var own=campaignView?.Players.FirstOrDefault(p=>p.Id==localId);
-        var build=own?.Loadout??profile.Presets[profile.SelectedPreset].Loadout;
+        var build=players.GetValueOrDefault(localId)?.Loadout??own?.Loadout??profile.Presets[profile.SelectedPreset].Loadout;
         return new(profile,build,own,own is not null && campaignView?.Complete==false && phase==RacePhase.Lobby,balanceRules);
     }
     private void OpenGarage(){RefreshGarage();garage.Open(GarageContext());}
     private void RefreshGarage(){if(garage?.IsOpen==true)garage.Refresh(GarageContext());}
     private void SelectPreset(int slot)
     {
+        if(queueTicket is not null){CancelQuick();LeaveInternal();ui.ShowMenu();}
         profile.SelectedPreset=Math.Clamp(slot,0,2);SaveProfile();
         if(inSession && phase==RacePhase.Lobby && gameMode==GameMode.Campaign)
         {
@@ -119,7 +122,8 @@ public partial class Main
         var own=campaign.Players[id];
         while(campaign.TryPurchase(id,own.Loadout.WeaponId)){}
         while(campaign.TryPurchase(id,"mine")){}
-        string branch=new[]{"Drive","Energy","Defense","Sabotage","Ballistics"}[Math.Abs(id%5)];
+        var goal=catalog.BotArchetypes[Math.Abs(id%5)].Loadout;
+        string branch=catalog.Skills.Nodes[goal.SkillRanks.Keys.First()].Branch;
         bool bought=true;
         while(bought)
         {
@@ -183,7 +187,7 @@ public partial class Main
     {
         gameMode=message.Mode;
         if(message.SessionId!=Guid.Empty)raceSessionId=message.SessionId;
-        campaignView=message.Campaign;ui.ShowCampaign(campaignView,localId);RefreshGarage();
+        campaignView=message.Campaign;ui.ShowCampaign(campaignView,localId);
     }
     private void PreviewGarage()
     {

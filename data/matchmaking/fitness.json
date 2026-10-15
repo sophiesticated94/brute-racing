@@ -1,0 +1,36 @@
+{
+  "stats": {
+    "car.MaxSpeed": 10,
+    "car.Acceleration": 8,
+    "car.Grip": 10,
+    "car.TurnSpeed": 10,
+    "car.MaxHealth": 1,
+    "car.Armor": 200,
+    "car.KnockbackResistance": 60,
+    "car.TurretTraverseSpeed": 8,
+    "primary.Range": 1,
+    "primary.AmmoCapacity": 0.1,
+    "primary.ArmorPenetration": 100,
+    "primary.CoolingRate": 1,
+    "primary.EnergyRegen": 1,
+    "mines.SplashRadius": 12,
+    "mines.AmmoCapacity": 6,
+    "mines.MaxActive": 8,
+    "mechanics.RegenPerSecond": 5
+  },
+  "perks": {
+    "Dps": 2,
+    "MineDps": 1,
+    "ArmorPierce": 50,
+    "LaserPierce": 100,
+    "Salvo": 80,
+    "EmpField": 90,
+    "FastArming": 20,
+    "DriftBoost": 80,
+    "DriftCooling": 60,
+    "CheckpointAmmo": 60,
+    "Regeneration": 90,
+    "EmergencyMine": 50,
+    "TurretJam": 40
+  }
+}

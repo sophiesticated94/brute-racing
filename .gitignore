@@ -6,3 +6,4 @@ src/Game.Client/data/
 artifacts/
 TestResults/
 *.user
+**/profile.json*

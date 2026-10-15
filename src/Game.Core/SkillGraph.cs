@@ -24,9 +24,10 @@ public sealed class SkillGraph
                 throw new InvalidDataException("Nieprawidłowa definicja węzła DAG.");
             foreach (var effect in node.RankEffects)
             {
-                if (effect?.Modifiers is null) throw new InvalidDataException("Brak efektów rangi.");
+                if (effect?.Modifiers is null || ((int)effect.Mechanics & ~63)!=0) throw new InvalidDataException("Brak efektów rangi.");
                 foreach (var modifier in effect.Modifiers)
                 {
+                    if(modifier is null || modifier.Stat is null)throw new InvalidDataException("Nieprawidłowy modyfikator.");
                     var parts = modifier.Stat.Split('.',2);
                     Type? target = parts[0] switch { "car" => typeof(CarDefinition), "primary" or "mines" => typeof(WeaponDefinition), "mechanics" => typeof(MechanicsStats), _ => null };
                     if (parts.Length != 2 || target?.GetProperty(parts[1]) is null || !StatLimits.IsKnown(parts[1]) || !float.IsFinite(modifier.Value) ||

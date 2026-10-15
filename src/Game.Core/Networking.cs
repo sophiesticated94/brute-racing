@@ -36,11 +36,11 @@ public sealed record VehicleState(int Id, Vector3 Position, Quaternion Rotation,
 public sealed record WorldSnapshot(uint RaceId, uint Tick, RacePhase Phase, double Elapsed, float Remaining, VehicleState[] Vehicles);
 public sealed record RaceEvent(uint RaceId, long EventId, string Kind, int Actor, int Target, Vector3 Position, Vector3 End, float Value, WeaponDefinition? Weapon = null);
 public sealed record LobbyPlayer(int Id, string Name, int Color, bool Ready, bool Bot, PlayerLoadoutDto Loadout);
-public sealed record SessionMessage(string Kind, int Protocol = 2, string ContentHash = "",
+public sealed record SessionMessage(string Kind, int Protocol = 3, string ContentHash = "",
     string Name = "", int Color = 0, PlayerLoadoutDto? Loadout = null,
     LobbyPlayer[]? Players = null, string Message = "", int[]? Ranking = null, uint RaceId = 0, double SentTime = 0,
     LobbyBalanceRules? BalanceRules = null, GameMode Mode = GameMode.Exhibition,
-    CampaignView? Campaign = null, Guid SessionId = default, RewardReceipt? Reward = null, string ItemId = "", string CosmeticId = "stock");
+    CampaignView? Campaign = null, Guid SessionId = default, RewardReceipt? Reward = null, string ItemId = "", string CosmeticId = "stock", Guid MatchId=default, Guid TicketId=default);
 
 public interface INetworkTransport : IDisposable
 {

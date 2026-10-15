@@ -69,7 +69,7 @@ public partial class Main
         float yaw = Mathf.Atan2(-aim.X, -aim.Z);
         bool fire = !noWeapons && enemy is not null && aim.Length() < 35 && r.Invulnerable <= 0 && (tick + (uint)Math.Abs(r.Info.Id % 10)) % 90 < 42;
         bool mine = !noWeapons && speed > 8 && tick % (uint)(240 + Math.Abs(r.Info.Id % 7) * 19) == 0;
-        return new(sequence, tick, Mathf.Clamp(steer, -1, 1), speed < targetSpeed ? 1 : 0, speed > targetSpeed + 1 ? .35f : 0, yaw, false, fire, mine);
+        return new(sequence, tick, Mathf.Clamp(steer, -1, 1), speed < targetSpeed ? 1 : 0, speed > targetSpeed + 1 ? .35f : 0, yaw, arguments.ContainsKey("exercise-mechanics") && speed>8 && tick%360 is >=180 and <240, fire, mine);
     }
 
 }

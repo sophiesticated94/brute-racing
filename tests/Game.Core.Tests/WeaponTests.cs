@@ -40,4 +40,12 @@ public class WeaponTests
         Assert.Throws<InvalidDataException>(() => StatLimits.Clamp("FireRate", float.NaN));
         Assert.Equal(.1f, StatLimits.Clamp("FireRate",0));
     }
+    [Fact]
+    public void InvalidRawDefinitionsAreRejectedBeforeTheyReachSimulation()
+    {
+        var catalog=DomainTests.Catalog();
+        Assert.Throws<InvalidDataException>(()=>StatLimits.ValidateNumbers(catalog.Cars["rook"] with{Acceleration=float.PositiveInfinity}));
+        Assert.Throws<InvalidDataException>(()=>StatLimits.ValidateWeapon(catalog.Weapons["laser"] with{Perks=(WeaponPerkFlags)128}));
+        Assert.Throws<InvalidDataException>(()=>StatLimits.ValidateWeapon(catalog.Weapons["rocket"] with{Damage=10000}));
+    }
 }

@@ -30,7 +30,10 @@ public sealed class GameCatalog
     public SkillGraph Skills { get; private set; } = new([]);
     public EconomyDefinition Economy { get; private set; } = new();
     public Dictionary<string,CosmeticDefinition> Cosmetics {get;} = new(StringComparer.Ordinal);
-    public static string[] Files => ["cars/rook.json", "weapons/weapons.json", "tracks/cinder.json", "skills/skills.json", "rules/economy.json", "cosmetics/catalog.json"];
+    public static string[] Files => ["cars/rook.json", "weapons/weapons.json", "tracks/cinder.json", "skills/skills.json", "rules/economy.json", "cosmetics/catalog.json", "matchmaking/fitness.json", "bots/archetypes.json"];
+    public string ContentHash {get;private set;} = "";
+    public FitnessWeights Fitness {get;private set;} = null!;
+    public BotArchetype[] BotArchetypes {get;private set;} = [];
     public TrackDefinition Track { get; private set; } = null!;
 
     public static GameCatalog Load(Func<string, string> read)
@@ -41,7 +44,7 @@ public sealed class GameCatalog
             car.MaxHealth <= 0 || car.Spring <= 0 || car.Damping < 0 || car.SuspensionLength <= 0 ||
             car.Armor is < 0 or >= 1 || car.Grip <= 0 || car.Acceleration <= 0 || car.Braking <= 0)
             throw new InvalidDataException("Nieprawidłowa definicja samochodu.");
-        catalog.Cars.Add(car.Id, car);
+        StatLimits.ValidateNumbers(car);catalog.Cars.Add(car.Id, car);
         foreach (var group in JsonSerializer.Deserialize<WeaponDefinition[]>(read("weapons/weapons.json"), Json)!.GroupBy(w => w.Id, StringComparer.Ordinal))
         {
             var levels = group.OrderBy(w => w.Level).ToArray();
@@ -52,12 +55,12 @@ public sealed class GameCatalog
         foreach (var required in new[] { "machine_gun", "laser", "rocket", "mine" })
             if (!catalog.Weapons.ContainsKey(required)) throw new InvalidDataException($"Brak broni: {required}");
         catalog.Track = JsonSerializer.Deserialize<TrackDefinition>(read("tracks/cinder.json"), Json)!;
-        if (catalog.Track.Checkpoints < 3 || catalog.Track.Segments < catalog.Track.Checkpoints ||
+        if (!float.IsFinite(catalog.Track.Width) || !float.IsFinite(catalog.Track.RadiusX) || !float.IsFinite(catalog.Track.RadiusZ) || catalog.Track.Checkpoints < 3 || catalog.Track.Segments < catalog.Track.Checkpoints ||
             catalog.Track.Width < 6 || catalog.Track.RadiusX <= catalog.Track.Width || catalog.Track.RadiusZ <= catalog.Track.Width || catalog.Track.Laps < 1)
             throw new InvalidDataException("Nieprawidłowa definicja toru.");
         catalog.Skills = new(JsonSerializer.Deserialize<SkillNodeDefinition[]>(read("skills/skills.json"),Json)!);
         catalog.Economy = JsonSerializer.Deserialize<EconomyDefinition>(read("rules/economy.json"),Json)!;
-        if(catalog.Economy.XpPerLevel<=0 || catalog.Economy.SkillPointsPerLevel!=6 || catalog.Economy.BaseCredits<0 || catalog.Economy.CreditsRoundStep<0 || catalog.Economy.CampaignCoins<0)
+        if(catalog.Economy.XpPerLevel<=0 || catalog.Economy.SkillPointsPerLevel!=6 || catalog.Economy.BaseCredits<0 || catalog.Economy.CreditsRoundStep<0 || catalog.Economy.CampaignCoins<0 || catalog.Economy.FinishXp<0 || catalog.Economy.PositionCredits<0 || catalog.Economy.CoinsPerRound<0 || catalog.Economy.CoinsPerPosition<0)
             throw new InvalidDataException("Nieprawidłowa ekonomia.");
         foreach(var item in JsonSerializer.Deserialize<CosmeticDefinition[]>(read("cosmetics/catalog.json"),Json)!)
         {
@@ -66,6 +69,12 @@ public sealed class GameCatalog
             catalog.Cosmetics.Add(item.Id,item);
         }
         if(!catalog.Cosmetics.ContainsKey("stock"))throw new InvalidDataException("Brak fabrycznej kosmetyki.");
+        catalog.Fitness=JsonSerializer.Deserialize<FitnessWeights>(read("matchmaking/fitness.json"),Json)!;
+        if(catalog.Fitness.Stats.Count==0 || catalog.Fitness.Stats.Values.Concat(catalog.Fitness.Perks.Values).Any(v=>!float.IsFinite(v)||v<0) || !catalog.Fitness.Perks.ContainsKey("Dps") || !catalog.Fitness.Perks.ContainsKey("MineDps"))throw new InvalidDataException("Nieprawidłowe wagi fitness.");
+        _=FitnessCalculator.Calculate(catalog,PlayerLoadoutDto.Default);
+        catalog.BotArchetypes=JsonSerializer.Deserialize<BotArchetype[]>(read("bots/archetypes.json"),Json)!;
+        if(catalog.BotArchetypes.Length!=5 || catalog.BotArchetypes.Select(b=>b.Id).Distinct().Count()!=5 || catalog.BotArchetypes.Any(b=>!new BuildValidator(catalog).IsValid(b.Loadout)))throw new InvalidDataException("Nieprawidłowe archetypy botów.");
+        catalog.ContentHash=PacketCodec.ContentHash(Files.OrderBy(f=>f,StringComparer.Ordinal).Select(read));
         return catalog;
     }
 }

@@ -57,7 +57,7 @@ public partial class Main
     {
         int primary = arguments.TryGetValue("weapon-level",out var level) ? Math.Clamp(int.Parse(level),1,5) : 1;
         int mine = arguments.TryGetValue("mine-level",out var mines) ? Math.Clamp(int.Parse(mines),1,5) : 1;
-        if(gameMode==GameMode.Quick)return profile.Presets[profile.SelectedPreset].Loadout with{CosmeticId=profile.SelectedCosmetic};
+        if(gameMode==GameMode.Quick)return queuedBuild??profile.Presets[profile.SelectedPreset].Loadout with{CosmeticId=profile.SelectedCosmetic};
         if(gameMode==GameMode.Campaign)
         {
             var own=campaignView?.Players.FirstOrDefault(p=>p.Id==localId);

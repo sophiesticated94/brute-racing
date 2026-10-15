@@ -3,7 +3,7 @@ on: [push, pull_request]
 jobs:
   game:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -26,6 +26,18 @@ jobs:
       - name: Connection loss and AI takeover
         shell: pwsh
         run: ./scripts/connection-tests.ps1 -SkipBuild
+      - name: Eight advanced builds, drift boost and EMP
+        shell: pwsh
+        run: ./scripts/mechanics-smoke.ps1 -SkipBuild
+      - name: Authoritative three-race campaign and persistent rewards
+        shell: pwsh
+        run: ./scripts/integration.ps1 -Campaign -Impaired -Combat -SkipBuild -Port 29860
+      - name: Quick matchmaking including unreachable host recovery
+        shell: pwsh
+        run: ./scripts/quick-integration.ps1 -UnreachableHost -SkipBuild
+      - name: Eight peers and rematch
+        shell: pwsh
+        run: ./scripts/integration.ps1 -Clients 7 -Rounds 2 -SkipBuild -Port 29865
       - name: Export Windows and Linux
         shell: pwsh
         run: ./scripts/export.ps1
@@ -54,3 +66,18 @@ jobs:
         with:
           name: linux-smoke-report
           path: linux-report.json
+  directory-container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run directory container
+        run: |
+          docker build -f src/Game.DirectoryApi/Dockerfile -t brute-racing-directory .
+          docker run -d --name directory -p 5080:8080 brute-racing-directory
+          for attempt in $(seq 1 30); do
+            if curl --fail http://localhost:5080/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs directory
+          exit 1

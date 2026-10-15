@@ -1,0 +1,7 @@
+**/bin
+**/obj
+**/.godot
+.git
+.tools
+artifacts
+TestResults

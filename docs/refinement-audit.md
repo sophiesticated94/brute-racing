@@ -47,3 +47,15 @@ Build bez błędów; 24 testy xUnit; impaired/combat PASS; przejęcie AI i utrat
 ## Etap 4 — kampania i profil
 
 38 testów domeny/profilu oraz pełna weryfikacja `verify-stage.ps1 -Stage progression`: build, ENet impaired/combat, rozłączenia i 8 aut headless — PASS. Dodatkowy `integration.ps1 -Campaign -Impaired -Combat` ukończył 3 rundy w oddzielnych procesach z tym samym stanem kampanii i nagrodami; każdy profil ma 3 wyścigi i 1 kampanię. Profile testowe są izolowane w artifacts. Sprawdzono render garażu (pan/zoom DAG, panel statystyk, archiwum i kosmetyka).
+
+## Etap 5 — katalog i końcowa integracja
+
+Fitness ma jawne wagi, a katalog liczy go z walidowanej deklaracji. Pięć archetypów
+botów jest ładowanych i walidowanych razem z danymi. Protokół podniesiono do 3.
+`verify-stage.ps1 -Stage directory` oraz powtórzenie `-Stage final` przeszły
+build, xUnit, impaired/combat, rozłączenia i smoke ośmiu aut. Rozszerzony zestaw
+ma 48 testów. Quick przeszedł rzeczywiste HTTP + ENet w czterech procesach oraz
+ponowne zestawienie po celowo nieosiągalnym hoście. Test wykrył wyścig spóźnionego
+zgłoszenia błędu; akcje są teraz ograniczone GUID oferty i mają test regresji.
+Kontener API zbudowano i uruchomiono, sprawdzono health. Dwa rewanże w ośmiu
+procesach, eksporty Windows/Linux oraz render opisano w `verification.md`.

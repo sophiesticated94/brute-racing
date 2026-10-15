@@ -52,6 +52,8 @@ public partial class GarageScreen : CanvasLayer
         Text(right,"KOSMETYKA • BEZ WPŁYWU NA SIŁĘ",16,new("ffbe45"));cosmetics=new OptionButton();right.AddChild(cosmetics);
         cosmetics.ItemSelected+=_=>UpdateCosmetic();
         buyCosmetic=Button(right,"KUP / ZAŁÓŻ",()=>Command?.Invoke("cosmetic",catalog.Cosmetics.Keys.ElementAt((int)cosmetics.Selected),0));
+        for(int i=0;i<5;i++)right.MoveChild(right.GetChild(0),right.GetChildCount()-1);
+        right.MoveChild(detail,0);right.MoveChild(rankButton,1);right.MoveChild(respecButton,2);
         confirmation=new ConfirmationDialog{Title="Potwierdzenie"};AddChild(confirmation);confirmation.GetOkButton().Text="POTWIERDŹ";confirmation.GetCancelButton().Text="ANULUJ";
         confirmation.Confirmed+=()=>{var action=pendingConfirm;pendingConfirm=null;action?.Invoke();};
         root.Visible=false;
@@ -64,7 +66,7 @@ public partial class GarageScreen : CanvasLayer
         presets.Clear();for(int i=0;i<3;i++)presets.AddItem($"{i+1}. {value.Profile.Presets[i].Name}");presets.Select(value.Profile.SelectedPreset);
         weapons.Select(Array.IndexOf(new[]{"machine_gun","laser","rocket"},value.Build.WeaponId));weapons.Disabled=!value.Editable;
         var build=VehicleStatsCalculator.CalculateBuild(catalog,value.Build);
-        stats.Text=$"ROOK • {SkillCanvas.BranchName("Drive")}\nPrędkość {build.Vehicle.MaxSpeed*3.6f:0} km/h\nPrzyspieszenie {build.Vehicle.Acceleration:0.0}\nZdrowie {build.Vehicle.MaxHealth:0}   Pancerz {build.Vehicle.Armor:P0}\nOdporność na odrzut {build.Vehicle.KnockbackResistance:P0}\nWieżyczka {Mathf.RadToDeg(build.Vehicle.TurretTraverseSpeed):0}°/s\n{build.Primary.Name} {build.Primary.Level}/5 • obrażenia {build.Primary.Damage:0.0}\nStrzały/s {build.Primary.FireRate:0.0}   Amunicja {build.Primary.AmmoCapacity}\nChłodzenie {build.Primary.CoolingRate:0.0}/s\nMiny {build.Mines.Level}/5 • aktywne {build.Mines.MaxActive}";
+        stats.Text=$"ROOK • {SkillCanvas.BranchName("Drive")}\nPrędkość {build.Vehicle.MaxSpeed*3.6f:0} km/h\nPrzyspieszenie {build.Vehicle.Acceleration:0.0}\nZdrowie {build.Vehicle.MaxHealth:0}   Pancerz {build.Vehicle.Armor:P0}\nOdporność na odrzut {build.Vehicle.KnockbackResistance:P0}\nWieżyczka {Mathf.RadToDeg(build.Vehicle.TurretTraverseSpeed):0}°/s\n{build.Primary.Name} {build.Primary.Level}/5 • obrażenia {build.Primary.Damage:0.0}\nStrzały/s {build.Primary.FireRate:0.0}   Amunicja {build.Primary.AmmoCapacity}\nChłodzenie {build.Primary.CoolingRate:0.0}/s\nMiny {build.Mines.Level}/5 • aktywne {build.Mines.MaxActive}\nSiła buildu {FitnessCalculator.Calculate(catalog,value.Build).Total:0} • {catalog.Skills.Cost(value.Build.SkillRanks)} SP";
         SetPurchase(buyPrimary,build.Primary,participant,value.Editable);SetPurchase(buyMines,build.Mines,participant,value.Editable);
         graph.UpdateBuild(value.Build,participant?.AvailablePoints??0);UpdateDetail();respecButton.Disabled=!value.Editable;
         int selection=(int)cosmetics.Selected;cosmetics.Clear();foreach(var item in catalog.Cosmetics.Values)cosmetics.AddItem($"{item.Name} • {(value.Profile.OwnedCosmetics.Contains(item.Id)?"POSIADANE":$"{item.Price} monet")}");

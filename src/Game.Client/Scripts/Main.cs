@@ -123,7 +123,7 @@ public partial class Main : Node3D
             contentHash = PacketCodec.ContentHash(docs.OrderBy(p => p.Key).Select(p => p.Value));
             BuildWorld();
             ui = new GameUi(); AddChild(ui); audio = new GameAudio(); AddChild(audio);
-            ui.ConfigureMap(track.Path);
+            ui.ConfigureMap(track.Path);ui.ConfigureCatalog(catalog);
             InitializeProgression();
             ui.BalanceChanged += mode => SetBalance(mode);
             if (arguments.TryGetValue("balance", out var balance)) SetBalance(balance.ToLowerInvariant() switch { "faircap" => LobbyBalanceMode.FairCap, "open" or "openmayhem" => LobbyBalanceMode.OpenMayhem, _ => LobbyBalanceMode.Stock });
@@ -135,7 +135,8 @@ public partial class Main : Node3D
             if (arguments.TryGetValue("bots", out var bots)) ui.Bots.Value = Math.Clamp(int.Parse(bots), 0, 7);
             if (arguments.TryGetValue("weapon", out var weapon)) ui.Weapon.Select(weapon == "laser" ? 1 : weapon == "rocket" ? 2 : 0);
             if (arguments.TryGetValue("name", out var name)) ui.PlayerName.Text = name;
-            if (arguments.TryGetValue("join", out var address)) { ui.Address.Text = address; JoinHost(); }
+            if(gameMode==GameMode.Quick)StartQuick();
+            else if (arguments.TryGetValue("join", out var address)) { ui.Address.Text = address; JoinHost(); }
             else if (arguments.ContainsKey("host")) StartHosting();
             else if (smoke || arguments.ContainsKey("solo")) StartSolo();
             if(arguments.ContainsKey("garage-preview"))PreviewGarage();
@@ -163,7 +164,7 @@ public partial class Main : Node3D
             if (ui.Internet.ButtonPressed) MapPort((int)ui.Port.Value);
             GD.Print($"HOST_READY port={(int)ui.Port.Value}");
         }
-        catch (Exception e) { Leave(e.Message); }
+        catch (Exception e) { ConnectionFailed(e.Message); }
     }
     private void JoinHost()
     {
@@ -173,7 +174,12 @@ public partial class Main : Node3D
             inSession = true; isHost = false; localId = transport.LocalId; connectionStart = lastServerPacket = now;
             ui.Notice("Łączenie z gospodarzem…", 10);
         }
-        catch (Exception e) { Leave(e.Message); }
+        catch (Exception e) { ConnectionFailed(e.Message); }
+    }
+    private void ConnectionFailed(string message)
+    {
+        if(queueTicket is not null){LeaveInternal();ui.ShowMenu();ui.Notice(message,6);}
+        else Leave(message);
     }
     private void AddBots(int count)
     {
@@ -181,12 +187,17 @@ public partial class Main : Node3D
         {
             int id = -i - 1;
             players[id] = new(id, new[] { "BOLT", "NOVA", "RUST", "ECHO", "FLINT", "APEX", "DUNE" }[i], (i + 1) % 8, true, true,
-                new("rook", new[] { "machine_gun", "rocket", "laser" }[i % 3], 1, new()));
+                BotBuild(i));
         }
+    }
+    private PlayerLoadoutDto BotBuild(int index)
+    {
+        var desired=catalog.BotArchetypes[index%catalog.BotArchetypes.Length].Loadout;
+        return ValidateBuild(desired,(index+1)%8)!;
     }
     private void ChangeLoadout()
     {
-        if (!inSession || phase != RacePhase.Lobby) return;
+        if (!inSession || phase != RacePhase.Lobby || gameMode==GameMode.Quick) return;
         if (isHost && players.TryGetValue(localId, out var p))
         {
             var build=SelectedLoadout();
@@ -209,6 +220,7 @@ public partial class Main : Node3D
     }
     private void TryStartRace()
     {
+        if (gameMode==GameMode.Quick && !quickStartApproved)return;
         if (!isHost || (transport is not null && players.Count < 2) || players.Values.Any(p => !p.Ready)) return;
         StartRace();
     }
@@ -254,14 +266,14 @@ public partial class Main : Node3D
     public override void _PhysicsProcess(double delta)
     {
         if (catalog is null) return;
-        now += delta; transport?.Poll(); FlushDelayed();
+        now += delta; transport?.Poll(); FlushDelayed();UpdateQuick();
         if (inSession && !isHost && transport is not null && now >= nextPing)
         { nextPing = now + 1; SendControl(1, new("ping", SentTime: now)); }
         if (smoke && now > maxSeconds && !resultsWritten)
         {
             GD.PushError("SMOKE_TIMEOUT"); WriteResults(false); GetTree().Quit(2); return;
         }
-        if (inSession && !isHost && now - lastServerPacket > 12) { Leave("Brak odpowiedzi gospodarza (12 s)."); return; }
+        if (inSession && !isHost && now - lastServerPacket > 10) { if(queueTicket is not null&&phase==RacePhase.Lobby)RetryQuick();else Leave("Brak odpowiedzi gospodarza (10 s)."); return; }
         if (isHost && phase == RacePhase.Lobby && autoStart && now >= autoStartAt && players.Values.Count(p => !p.Bot) >= expectedPlayers)
         {
             foreach (var id in players.Keys.ToArray()) players[id] = players[id] with { Ready = true };
@@ -359,7 +371,7 @@ public partial class Main : Node3D
         transport?.Dispose(); transport = null; inSession = false; phase = RacePhase.Lobby;
         players.Clear(); acceptedHello.Clear(); sentBuildProbes = false; campaign=null;campaignView=null;garage?.Close(); delayed.Clear(); finalRanking = []; if (raceRoot is not null) ClearRace();
     }
-    private void Leave(string message) { SaveProfile(); LeaveInternal(); ui.ShowMenu(); ui.Notice(message, 7); GD.Print(message); }
+    private void Leave(string message) { CancelQuick();SaveProfile(); LeaveInternal(); ui.ShowMenu(); ui.Notice(message, 7); GD.Print(message); }
     private void WriteResults(bool success)
     {
         resultsWritten = true;
@@ -371,6 +383,7 @@ public partial class Main : Node3D
             simulatedFps = frameTotal > 0 ? frameCount / frameTotal : 0,
             averageFps = wallFrameTotal > 0 ? (frameCount - 1) / wallFrameTotal : 0, worstFrameMs = wallWorstFrame * 1000,
             rounds = roundReports, events = eventCounts,
+            quickOffers,quickRetries,quickMatchId=quickOffer?.Id,fitness=FitnessCalculator.Calculate(catalog,RequestedLoadout()).Total,
             rttMs = diagnostics.RttMs, jitterMs = diagnostics.JitterMs, maxJitterMs = diagnostics.MaxJitterMs, snapshotAgeMs = diagnostics.SnapshotAgeMs(now), pingSamples = diagnostics.PingSamples,
             meanCorrection = correctionCount > 0 ? correctionTotal / correctionCount : 0, maxCorrection = correctionMax, hardCorrections,
             vehicles = racers.Values.Select(r => new { id = r.Info.Id, laps = isHost ? r.Progress.CompletedLaps : r.NetworkState?.Lap ?? 0,
@@ -381,5 +394,5 @@ public partial class Main : Node3D
         if (resultPath.Length > 0) { Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(resultPath))!); System.IO.File.WriteAllText(resultPath, json); }
         GD.Print("SMOKE_RESULT " + JsonSerializer.Serialize(report));
     }
-    public override void _ExitTree() { if(ui is not null)SaveProfile(); transport?.Dispose(); }
+    public override void _ExitTree() { CancelQuick();if(ui is not null)SaveProfile(); transport?.Dispose(); }
 }

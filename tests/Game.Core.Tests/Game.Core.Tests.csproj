@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Game.Core\Game.Core.csproj" />
+    <ProjectReference Include="..\..\src\Game.DirectoryApi\Game.DirectoryApi.csproj" />
   </ItemGroup>
 
 </Project>

@@ -14,7 +14,7 @@ public partial class Main
             if (!isHost && id == 1)
             {
                 localId = net.LocalId;
-                SendControl(1, new("hello", ContentHash: contentHash, Name: SelectedName(), Color: (int)ui.Paint.Selected, Loadout: SelectedLoadout()));
+                SendControl(1, new("hello", ContentHash: contentHash, Name: SelectedName(), Color: (int)ui.Paint.Selected, Loadout: SelectedLoadout(),MatchId:quickOffer?.Id??Guid.Empty,TicketId:queueTicket?.Id??Guid.Empty));
             }
             else if (isHost && phase != RacePhase.Lobby) net.Disconnect(id);
         };
@@ -22,14 +22,15 @@ public partial class Main
         {
             if (!isHost && id == 1)
             {
+                if(queueTicket is not null&&phase==RacePhase.Lobby){RetryQuick();return;}
                 Leave("Gospodarz zakończył połączenie.");
                 if (arguments.ContainsKey("exit-on-disconnect")) GetTree().Quit();
                 return;
             }
-            acceptedHello.Remove(id);
+            acceptedHello.Remove(id);quickPeers.Remove(id);
             if (isHost && players.TryGetValue(id, out var p))
             {
-                if (phase == RacePhase.Lobby) players.Remove(id);
+                if (phase == RacePhase.Lobby && campaign?.CompletedRounds is not >0) players.Remove(id);
                 else
                 {
                     players[id] = p with { Bot = true, Ready = true, Name = p.Name + " · AI" };
@@ -79,7 +80,7 @@ public partial class Main
             if (m.Kind == "hello")
             {
                 if (phase != RacePhase.Lobby || campaign?.CompletedRounds>0 || acceptedHello.ContainsKey(sender)) { transport?.Disconnect(sender); return; }
-                if (m.Protocol != 2 || m.ContentHash != contentHash || !new BuildValidator(catalog).IsValid(m.Loadout) || m.Color is < 0 or > 7 || m.Name is null || m.Name.Length > 20)
+                if (m.Protocol != 3 || m.ContentHash != contentHash || !new BuildValidator(catalog).IsValid(m.Loadout) || m.Color is < 0 or > 7 || m.Name is null || m.Name.Length > 20)
                 {
                     SendControl(sender, new("error", Message: "Niezgodna wersja gry, dane lub build.")); transport?.Disconnect(sender); return;
                 }
@@ -90,6 +91,7 @@ public partial class Main
                     if (bot is null) { transport?.Disconnect(sender); return; }
                     players.Remove(bot.Id);
                 }
+                if(!ValidateQuickHello(sender,m)){transport?.Disconnect(sender);return;}
                 acceptedHello[sender] = now; autoStartAt = Math.Max(autoStartAt,now+.4);
                 players[sender] = new(sender, CleanName(m.Name), m.Color, autoStart, false, ValidateBuild(m.Loadout,m.Color)!); PublishLobby();
                 GD.Print($"PLAYER_JOINED id={sender} count={players.Count}");
@@ -98,7 +100,7 @@ public partial class Main
             {
                 if (m.Kind == "campaign_action")HandleCampaignAction(sender,m.Message,m.ItemId);
                 if (m.Kind == "ready") { players[sender] = player with { Ready = !player.Ready }; PublishLobby(); }
-                if (m.Kind == "loadout") HandleBuildRequest(sender,m);
+                if (m.Kind == "loadout" && gameMode!=GameMode.Quick) HandleBuildRequest(sender,m);
             }
         }
         else if (sender == 1)
@@ -116,6 +118,7 @@ public partial class Main
                 if (m.Kind == "start") { raceId = m.RaceId; InitializeRace(); }
                 else if (m.Kind == "lobby") { phase = RacePhase.Lobby; ui.ShowLobby(players.Values.ToArray(), false, localId); ui.ShowBalance(balanceRules,false); ProbeBuilds(); }
                 else foreach (var p in players.Values) if (racers.TryGetValue(p.Id, out var r)) r.Info = p;
+                RefreshGarage();
             }
             if (m.Kind == "results" && m.RaceId == raceId && m.Ranking is not null) { UpdateCampaignMessage(m); finalRanking = m.Ranking; phase = RacePhase.Podium; ShowPodium(); }
         }
