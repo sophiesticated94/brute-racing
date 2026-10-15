@@ -1,0 +1,1538 @@
+[
+  {
+    "id": "drive_accel",
+    "name": "Wtrysk",
+    "description": "Wtrysk — wzmacnia Acceleration.",
+    "branch": "Drive",
+    "position": {
+      "x": 0,
+      "y": 0
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 1,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "car.Acceleration",
+            "operation": 1,
+            "value": 1.05
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.Acceleration",
+            "operation": 1,
+            "value": 1.1
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.Acceleration",
+            "operation": 1,
+            "value": 1.15
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "drive_speed",
+    "name": "Długie przełożenie",
+    "description": "Długie przełożenie — wzmacnia MaxSpeed.",
+    "branch": "Drive",
+    "position": {
+      "x": 0,
+      "y": 145
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "drive_accel",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 2,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "car.MaxSpeed",
+            "operation": 1,
+            "value": 1.03
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.MaxSpeed",
+            "operation": 1,
+            "value": 1.06
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.MaxSpeed",
+            "operation": 1,
+            "value": 1.09
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "drive_grip",
+    "name": "Opony sportowe",
+    "description": "Opony sportowe — wzmacnia Grip.",
+    "branch": "Drive",
+    "position": {
+      "x": 0,
+      "y": 290
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "drive_speed",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 3,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "car.Grip",
+            "operation": 1,
+            "value": 1.05
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.Grip",
+            "operation": 1,
+            "value": 1.1
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.Grip",
+            "operation": 1,
+            "value": 1.15
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "drive_drift",
+    "name": "Kontrola poślizgu",
+    "description": "Kontrola poślizgu — wzmacnia DriftFactor.",
+    "branch": "Drive",
+    "position": {
+      "x": 0,
+      "y": 435
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "drive_grip",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 4,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "car.DriftFactor",
+            "operation": 1,
+            "value": 1.08
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.DriftFactor",
+            "operation": 1,
+            "value": 1.16
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.DriftFactor",
+            "operation": 1,
+            "value": 1.24
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "drive_mass",
+    "name": "Taranujące podwozie",
+    "description": "Taranujące podwozie — wzmacnia Mass.",
+    "branch": "Drive",
+    "position": {
+      "x": 0,
+      "y": 580
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "drive_drift",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 5,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "car.Mass",
+            "operation": 1,
+            "value": 1.06
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.Mass",
+            "operation": 1,
+            "value": 1.12
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.Mass",
+            "operation": 1,
+            "value": 1.18
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "drive_boost",
+    "name": "Impuls po drifcie",
+    "description": "Impuls po drifcie — odblokowuje nową mechanikę.",
+    "branch": "Drive",
+    "position": {
+      "x": 0,
+      "y": 725
+    },
+    "maxRank": 1,
+    "rankCosts": [
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "drive_mass",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": "drive_specialization",
+    "requiredPlayerLevel": 6,
+    "rankEffects": [
+      {
+        "modifiers": [],
+        "mechanics": 1
+      }
+    ]
+  },
+  {
+    "id": "ballistics_traverse",
+    "name": "Szybka wieżyczka",
+    "description": "Szybka wieżyczka — wzmacnia TurretTraverseSpeed.",
+    "branch": "Ballistics",
+    "position": {
+      "x": 290,
+      "y": 0
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 1,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "car.TurretTraverseSpeed",
+            "operation": 1,
+            "value": 1.08
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.TurretTraverseSpeed",
+            "operation": 1,
+            "value": 1.16
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.TurretTraverseSpeed",
+            "operation": 1,
+            "value": 1.24
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "ballistics_rate",
+    "name": "Podajnik",
+    "description": "Podajnik — wzmacnia FireRate.",
+    "branch": "Ballistics",
+    "position": {
+      "x": 290,
+      "y": 145
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "ballistics_traverse",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 2,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "primary.FireRate",
+            "operation": 1,
+            "value": 1.05
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.FireRate",
+            "operation": 1,
+            "value": 1.1
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.FireRate",
+            "operation": 1,
+            "value": 1.15
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "ballistics_ammo",
+    "name": "Duży magazynek",
+    "description": "Duży magazynek — wzmacnia AmmoCapacity.",
+    "branch": "Ballistics",
+    "position": {
+      "x": 290,
+      "y": 290
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "ballistics_rate",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 3,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "primary.AmmoCapacity",
+            "operation": 1,
+            "value": 1.12
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.AmmoCapacity",
+            "operation": 1,
+            "value": 1.24
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.AmmoCapacity",
+            "operation": 1,
+            "value": 1.3599999999999999
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "ballistics_projectile",
+    "name": "Przyspieszacz pocisków",
+    "description": "Przyspieszacz pocisków — wzmacnia ProjectileSpeed.",
+    "branch": "Ballistics",
+    "position": {
+      "x": 290,
+      "y": 435
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "ballistics_ammo",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 4,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "primary.ProjectileSpeed",
+            "operation": 1,
+            "value": 1.08
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.ProjectileSpeed",
+            "operation": 1,
+            "value": 1.16
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.ProjectileSpeed",
+            "operation": 1,
+            "value": 1.24
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "ballistics_reclaim",
+    "name": "Odzysk na bramkach",
+    "description": "Odzysk na bramkach — odblokowuje nową mechanikę.",
+    "branch": "Ballistics",
+    "position": {
+      "x": 290,
+      "y": 580
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "ballistics_projectile",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 5,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "mechanics.CheckpointAmmoFraction",
+            "operation": 2,
+            "value": 0.04
+          }
+        ],
+        "mechanics": 4
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mechanics.CheckpointAmmoFraction",
+            "operation": 2,
+            "value": 0.08
+          }
+        ],
+        "mechanics": 4
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mechanics.CheckpointAmmoFraction",
+            "operation": 2,
+            "value": 0.12
+          }
+        ],
+        "mechanics": 4
+      }
+    ]
+  },
+  {
+    "id": "ballistics_pierce",
+    "name": "Pociski przeciwpancerne",
+    "description": "Pociski przeciwpancerne — wzmacnia ArmorPenetration.",
+    "branch": "Ballistics",
+    "position": {
+      "x": 290,
+      "y": 725
+    },
+    "maxRank": 1,
+    "rankCosts": [
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "ballistics_reclaim",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 6,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "primary.ArmorPenetration",
+            "operation": 0,
+            "value": 0.2
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "energy_efficiency",
+    "name": "Oszczędna wiązka",
+    "description": "Oszczędna wiązka — wzmacnia EnergyConsumption.",
+    "branch": "Energy",
+    "position": {
+      "x": 580,
+      "y": 0
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 1,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "primary.EnergyConsumption",
+            "operation": 1,
+            "value": 0.94
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.EnergyConsumption",
+            "operation": 1,
+            "value": 0.88
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.EnergyConsumption",
+            "operation": 1,
+            "value": 0.8200000000000001
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "energy_cooling",
+    "name": "Wydajne chłodzenie",
+    "description": "Wydajne chłodzenie — wzmacnia CoolingRate.",
+    "branch": "Energy",
+    "position": {
+      "x": 580,
+      "y": 145
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "energy_efficiency",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 2,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "primary.CoolingRate",
+            "operation": 1,
+            "value": 1.08
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.CoolingRate",
+            "operation": 1,
+            "value": 1.16
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.CoolingRate",
+            "operation": 1,
+            "value": 1.24
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "energy_heat",
+    "name": "Kontrola temperatury",
+    "description": "Kontrola temperatury — wzmacnia HeatGeneration.",
+    "branch": "Energy",
+    "position": {
+      "x": 580,
+      "y": 290
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "energy_cooling",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 3,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "primary.HeatGeneration",
+            "operation": 1,
+            "value": 0.95
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.HeatGeneration",
+            "operation": 1,
+            "value": 0.9
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.HeatGeneration",
+            "operation": 1,
+            "value": 0.85
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "energy_resume",
+    "name": "Szybki restart",
+    "description": "Szybki restart — wzmacnia OverheatResume.",
+    "branch": "Energy",
+    "position": {
+      "x": 580,
+      "y": 435
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "energy_heat",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 4,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "primary.OverheatResume",
+            "operation": 1,
+            "value": 1.1
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.OverheatResume",
+            "operation": 1,
+            "value": 1.2
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.OverheatResume",
+            "operation": 1,
+            "value": 1.3
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "energy_regen",
+    "name": "Alternator",
+    "description": "Alternator — wzmacnia EnergyRegen.",
+    "branch": "Energy",
+    "position": {
+      "x": 580,
+      "y": 580
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "energy_resume",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 5,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "primary.EnergyRegen",
+            "operation": 1,
+            "value": 1.1
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.EnergyRegen",
+            "operation": 1,
+            "value": 1.2
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "primary.EnergyRegen",
+            "operation": 1,
+            "value": 1.3
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "energy_radiators",
+    "name": "Radiatory driftowe",
+    "description": "Radiatory driftowe — odblokowuje nową mechanikę.",
+    "branch": "Energy",
+    "position": {
+      "x": 580,
+      "y": 725
+    },
+    "maxRank": 1,
+    "rankCosts": [
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "energy_regen",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 6,
+    "rankEffects": [
+      {
+        "modifiers": [],
+        "mechanics": 2
+      }
+    ]
+  },
+  {
+    "id": "defense_health",
+    "name": "Wzmocniona klatka",
+    "description": "Wzmocniona klatka — wzmacnia MaxHealth.",
+    "branch": "Defense",
+    "position": {
+      "x": 870,
+      "y": 0
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 1,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "car.MaxHealth",
+            "operation": 1,
+            "value": 1.08
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.MaxHealth",
+            "operation": 1,
+            "value": 1.16
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.MaxHealth",
+            "operation": 1,
+            "value": 1.24
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "defense_armor",
+    "name": "Pancerz warstwowy",
+    "description": "Pancerz warstwowy — wzmacnia Armor.",
+    "branch": "Defense",
+    "position": {
+      "x": 870,
+      "y": 145
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "defense_health",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 2,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "car.Armor",
+            "operation": 0,
+            "value": 0.025
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.Armor",
+            "operation": 0,
+            "value": 0.05
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.Armor",
+            "operation": 0,
+            "value": 0.07500000000000001
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "defense_resist",
+    "name": "Amortyzatory wybuchowe",
+    "description": "Amortyzatory wybuchowe — wzmacnia KnockbackResistance.",
+    "branch": "Defense",
+    "position": {
+      "x": 870,
+      "y": 290
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "defense_armor",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 3,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "car.KnockbackResistance",
+            "operation": 0,
+            "value": 0.05
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.KnockbackResistance",
+            "operation": 0,
+            "value": 0.1
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "car.KnockbackResistance",
+            "operation": 0,
+            "value": 0.15000000000000002
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "defense_protection",
+    "name": "Osłona odrodzenia",
+    "description": "Osłona odrodzenia — wzmacnia ProtectionBonus.",
+    "branch": "Defense",
+    "position": {
+      "x": 870,
+      "y": 435
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "defense_resist",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 4,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "mechanics.ProtectionBonus",
+            "operation": 0,
+            "value": 0.35
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mechanics.ProtectionBonus",
+            "operation": 0,
+            "value": 0.7
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mechanics.ProtectionBonus",
+            "operation": 0,
+            "value": 1.0499999999999998
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "defense_delay",
+    "name": "Szybka naprawa",
+    "description": "Szybka naprawa — wzmacnia RegenDelay.",
+    "branch": "Defense",
+    "position": {
+      "x": 870,
+      "y": 580
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "defense_protection",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 5,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "mechanics.RegenDelay",
+            "operation": 1,
+            "value": 0.85
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mechanics.RegenDelay",
+            "operation": 1,
+            "value": 0.7
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mechanics.RegenDelay",
+            "operation": 1,
+            "value": 0.55
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "defense_regen",
+    "name": "Samonaprawa poza walką",
+    "description": "Samonaprawa poza walką — odblokowuje nową mechanikę.",
+    "branch": "Defense",
+    "position": {
+      "x": 870,
+      "y": 725
+    },
+    "maxRank": 1,
+    "rankCosts": [
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "defense_delay",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 6,
+    "rankEffects": [
+      {
+        "modifiers": [],
+        "mechanics": 8
+      }
+    ]
+  },
+  {
+    "id": "sabotage_damage",
+    "name": "Ładunek miny",
+    "description": "Ładunek miny — wzmacnia Damage.",
+    "branch": "Sabotage",
+    "position": {
+      "x": 1160,
+      "y": 0
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 1,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "mines.Damage",
+            "operation": 1,
+            "value": 1.1
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mines.Damage",
+            "operation": 1,
+            "value": 1.2
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mines.Damage",
+            "operation": 1,
+            "value": 1.3
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "sabotage_radius",
+    "name": "Promień detonacji",
+    "description": "Promień detonacji — wzmacnia SplashRadius.",
+    "branch": "Sabotage",
+    "position": {
+      "x": 1160,
+      "y": 145
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "sabotage_damage",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 2,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "mines.SplashRadius",
+            "operation": 1,
+            "value": 1.06
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mines.SplashRadius",
+            "operation": 1,
+            "value": 1.12
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mines.SplashRadius",
+            "operation": 1,
+            "value": 1.18
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "sabotage_capacity",
+    "name": "Stojak na miny",
+    "description": "Stojak na miny — wzmacnia MaxActive.",
+    "branch": "Sabotage",
+    "position": {
+      "x": 1160,
+      "y": 290
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "sabotage_radius",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 3,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "mines.MaxActive",
+            "operation": 0,
+            "value": 1
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mines.MaxActive",
+            "operation": 0,
+            "value": 2
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mines.MaxActive",
+            "operation": 0,
+            "value": 3
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "sabotage_arming",
+    "name": "Czuły zapalnik",
+    "description": "Czuły zapalnik — wzmacnia ArmingTime.",
+    "branch": "Sabotage",
+    "position": {
+      "x": 1160,
+      "y": 435
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "sabotage_capacity",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 4,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "mines.ArmingTime",
+            "operation": 1,
+            "value": 0.88
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mines.ArmingTime",
+            "operation": 1,
+            "value": 0.76
+          }
+        ],
+        "mechanics": 0
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mines.ArmingTime",
+            "operation": 1,
+            "value": 0.64
+          }
+        ],
+        "mechanics": 0
+      }
+    ]
+  },
+  {
+    "id": "sabotage_emp",
+    "name": "Zakłócenie wieżyczki",
+    "description": "Zakłócenie wieżyczki — odblokowuje nową mechanikę.",
+    "branch": "Sabotage",
+    "position": {
+      "x": 1160,
+      "y": 580
+    },
+    "maxRank": 3,
+    "rankCosts": [
+      1,
+      1,
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "sabotage_arming",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": null,
+    "requiredPlayerLevel": 5,
+    "rankEffects": [
+      {
+        "modifiers": [
+          {
+            "stat": "mines.SlowFactor",
+            "operation": 2,
+            "value": 0.7999999999999999
+          },
+          {
+            "stat": "mines.SlowDuration",
+            "operation": 2,
+            "value": 2
+          }
+        ],
+        "mechanics": 32
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mines.SlowFactor",
+            "operation": 2,
+            "value": 0.75
+          },
+          {
+            "stat": "mines.SlowDuration",
+            "operation": 2,
+            "value": 3
+          }
+        ],
+        "mechanics": 32
+      },
+      {
+        "modifiers": [
+          {
+            "stat": "mines.SlowFactor",
+            "operation": 2,
+            "value": 0.7
+          },
+          {
+            "stat": "mines.SlowDuration",
+            "operation": 2,
+            "value": 4
+          }
+        ],
+        "mechanics": 32
+      }
+    ]
+  },
+  {
+    "id": "sabotage_emergency",
+    "name": "Awaryjny zrzut",
+    "description": "Awaryjny zrzut — odblokowuje nową mechanikę.",
+    "branch": "Sabotage",
+    "position": {
+      "x": 1160,
+      "y": 725
+    },
+    "maxRank": 1,
+    "rankCosts": [
+      2
+    ],
+    "prerequisites": [
+      {
+        "nodeId": "sabotage_emp",
+        "minRank": 1
+      }
+    ],
+    "exclusiveGroup": "drive_specialization",
+    "requiredPlayerLevel": 6,
+    "rankEffects": [
+      {
+        "modifiers": [],
+        "mechanics": 16
+      }
+    ]
+  }
+]

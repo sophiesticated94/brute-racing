@@ -40,3 +40,6 @@ Build bez błędów; 24 testy xUnit; impaired/combat PASS; przejęcie AI i utrat
 
 ## Etap uzbrojenia — wynik
 27 testów xUnit, pełny zestaw verify-stage weapons PASS. Dodatkowy smoke poziomu 5: salwy i 10 pól EMP. Utrata hosta sprawdzana na logu UTF-8, niezależnie od kodowania konsoli.
+
+## Etap DAG i walidacji — wynik
+32 testy xUnit; verify-stage skills PASS, w tym pięć odrzuconych sfałszowanych deklaracji na klienta ENet. FairCap testowany jako kopia z poprawnymi zależnościami.

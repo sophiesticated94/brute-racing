@@ -20,6 +20,9 @@ public partial class GameUi : CanvasLayer
     private Button start = null!, replay = null!, ready = null!;
     private Label notice = null!;
     private double noticeTime;
+    private OptionButton balanceOption = null!;
+    public event Action<LobbyBalanceMode>? BalanceChanged;
+    public void ShowBalance(LobbyBalanceRules rules, bool host) { balanceOption.Select((int)rules.Mode); balanceOption.Disabled = !host; }
     private RaceMap map = null!;
     private AimReticle reticle = null!;
     public void HitMarker() => reticle.Hit();
@@ -55,13 +58,15 @@ public partial class GameUi : CanvasLayer
         PlayerName.TextChanged += _ => LoadoutChanged?.Invoke();
         lobby = Card(new(38, 87), new(445, 610)); var l = Stack(lobby);
         AddText(l, "PADDOCK", 40, Ink); AddText(l, "Miedziany Kanion  /  3 okrążenia", 16, Accent);
+        balanceOption = new OptionButton(); foreach (var mode in new[] { "Stock · 0 SP / poz. 1", "FairCap · 15 SP / poz. 3", "OpenMayhem · 30 SP / poz. 5" }) balanceOption.AddItem(mode);
+        l.AddChild(balanceOption); balanceOption.ItemSelected += index => BalanceChanged?.Invoke((LobbyBalanceMode)index);
         AddText(l, "ROOK  /  wybierz uzbrojenie i lakier", 15, Muted);
         var lobbyWeapon = new OptionButton(); foreach (string w in new[] { "Karabin", "Laser", "Rakiety" }) lobbyWeapon.AddItem(w); l.AddChild(lobbyWeapon);
         var lobbyPaint = new OptionButton(); foreach (string c in new[] { "Bursztyn", "Turkus", "Koral", "Lawenda", "Limonka", "Kość słoniowa", "Pomarańcz", "Kobalt" }) lobbyPaint.AddItem(c); l.AddChild(lobbyPaint);
         lobbyWeapon.ItemSelected += index => { Weapon.Select((int)index); LoadoutChanged?.Invoke(); };
         lobbyPaint.ItemSelected += index => { Paint.Select((int)index); LoadoutChanged?.Invoke(); };
         lobby.VisibilityChanged += () => { lobbyWeapon.Select(Weapon.Selected); lobbyPaint.Select(Paint.Selected); };
-        lobbyList = AddText(l, "", 17, Ink); lobbyList.CustomMinimumSize = new(0, 205);
+        lobbyList = AddText(l, "", 17, Ink); lobbyList.CustomMinimumSize = new(0, 180);
         ready = AddButton(l, "GOTOWY / NIEGOTOWY", () => ReadyRequested?.Invoke(), true);
         start = AddButton(l, "START WYŚCIGU", () => StartRequested?.Invoke());
         AddButton(l, "WYJDŹ Z POKOJU", () => LeaveRequested?.Invoke()); lobby.Visible = false;

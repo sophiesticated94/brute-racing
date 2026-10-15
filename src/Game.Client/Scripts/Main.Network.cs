@@ -90,29 +90,28 @@ public partial class Main
                     if (bot is null) { transport?.Disconnect(sender); return; }
                     players.Remove(bot.Id);
                 }
-                acceptedHello[sender] = now;
-                players[sender] = new(sender, CleanName(m.Name), m.Color, autoStart, false, m.Loadout!); PublishLobby();
+                acceptedHello[sender] = now; autoStartAt = Math.Max(autoStartAt,now+.4);
+                players[sender] = new(sender, CleanName(m.Name), m.Color, autoStart, false, ValidateBuild(m.Loadout,m.Color)!); PublishLobby();
                 GD.Print($"PLAYER_JOINED id={sender} count={players.Count}");
             }
             else if (phase == RacePhase.Lobby && players.TryGetValue(sender, out var player))
             {
                 if (m.Kind == "ready") { players[sender] = player with { Ready = !player.Ready }; PublishLobby(); }
-                if (m.Kind == "loadout" && m.Color is >= 0 and < 8 && m.Name is not null && m.Name.Length <= 20 && new BuildValidator(catalog).IsValid(m.Loadout))
-                {
-                    players[sender] = player with { Name = CleanName(m.Name), Color = m.Color, Loadout = m.Loadout!, Ready = false }; PublishLobby();
-                }
+                if (m.Kind == "loadout") HandleBuildRequest(sender,m);
             }
         }
         else if (sender == 1)
         {
             if (m.Kind == "pong") { diagnostics.ObserveRtt(now - m.SentTime); return; }
+            if (m.Kind == "build_error") { ui.Notice(m.Message,3); return; }
             if (m.Kind == "error") { Leave(m.Message); return; }
             if (m.Kind is "lobby" or "start" or "roster")
             {
                 if (m.Players is null || m.Players.Length > 8 || m.Players.Any(p => !new BuildValidator(catalog).IsValid(p.Loadout) || p.Color is < 0 or > 7)) throw new InvalidDataException("Roster.");
+                if (m.BalanceRules is not null) { if (!m.BalanceRules.IsValid) throw new InvalidDataException("Balance rules."); balanceRules = m.BalanceRules; }
                 players.Clear(); foreach (var p in m.Players) players.Add(p.Id, p);
                 if (m.Kind == "start") { raceId = m.RaceId; InitializeRace(); }
-                else if (m.Kind == "lobby") { phase = RacePhase.Lobby; ui.ShowLobby(players.Values.ToArray(), false, localId); }
+                else if (m.Kind == "lobby") { phase = RacePhase.Lobby; ui.ShowLobby(players.Values.ToArray(), false, localId); ui.ShowBalance(balanceRules,false); ProbeBuilds(); }
                 else foreach (var p in players.Values) if (racers.TryGetValue(p.Id, out var r)) r.Info = p;
             }
             if (m.Kind == "results" && m.RaceId == raceId && m.Ranking is not null) { finalRanking = m.Ranking; phase = RacePhase.Podium; ShowPodium(); }

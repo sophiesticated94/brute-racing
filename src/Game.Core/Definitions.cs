@@ -27,7 +27,8 @@ public sealed class GameCatalog
     public Dictionary<string, CarDefinition> Cars { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, WeaponDefinition> Weapons { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, WeaponDefinition[]> WeaponLevels { get; } = new(StringComparer.Ordinal);
-    public static string[] Files => ["cars/rook.json", "weapons/weapons.json", "tracks/cinder.json"];
+    public SkillGraph Skills { get; private set; } = new([]);
+    public static string[] Files => ["cars/rook.json", "weapons/weapons.json", "tracks/cinder.json", "skills/skills.json"];
     public TrackDefinition Track { get; private set; } = null!;
 
     public static GameCatalog Load(Func<string, string> read)
@@ -52,22 +53,15 @@ public sealed class GameCatalog
         if (catalog.Track.Checkpoints < 3 || catalog.Track.Segments < catalog.Track.Checkpoints ||
             catalog.Track.Width < 6 || catalog.Track.RadiusX <= catalog.Track.Width || catalog.Track.RadiusZ <= catalog.Track.Width || catalog.Track.Laps < 1)
             throw new InvalidDataException("Nieprawidłowa definicja toru.");
+        catalog.Skills = new(JsonSerializer.Deserialize<SkillNodeDefinition[]>(read("skills/skills.json"),Json)!);
         return catalog;
     }
 }
 
 public sealed record PlayerLoadoutDto(string CarId, string WeaponId, int WeaponLevel,
-    Dictionary<string, int> SkillRanks, int MineLevel = 1)
+    Dictionary<string, int> SkillRanks, int MineLevel = 1, int PlayerLevel = 1, string CosmeticId = "stock")
 {
     public static PlayerLoadoutDto Default => new("rook", "machine_gun", 1, new());
-}
-
-public sealed class BuildValidator(GameCatalog catalog)
-{
-    public bool IsValid(PlayerLoadoutDto? loadout) => loadout is not null &&
-        catalog.Cars.ContainsKey(loadout.CarId ?? "") &&
-        catalog.Weapons.ContainsKey(loadout.WeaponId ?? "") && loadout.WeaponId != "mine" &&
-        loadout.WeaponLevel is >= 1 and <= 5 && loadout.MineLevel is >= 1 and <= 5 && loadout.SkillRanks is { Count: 0 };
 }
 
 public static class VehicleStatsCalculator
@@ -78,8 +72,10 @@ public static class VehicleStatsCalculator
     public static ComputedLoadoutStats CalculateBuild(GameCatalog catalog, PlayerLoadoutDto loadout)
     {
         if (!new BuildValidator(catalog).IsValid(loadout)) throw new ArgumentException("Nieprawidłowy build.", nameof(loadout));
-        return new(StatLimits.ClampCar(catalog.Cars[loadout.CarId]),
-            StatLimits.ClampWeapon(catalog.WeaponLevels[loadout.WeaponId][loadout.WeaponLevel - 1]),
-            StatLimits.ClampWeapon(catalog.WeaponLevels["mine"][loadout.MineLevel - 1]), new());
+        var effects = catalog.Skills.Modifiers(loadout.SkillRanks).ToArray();
+        return new(StatLimits.Apply(catalog.Cars[loadout.CarId] with {},"car",effects),
+            StatLimits.Apply(catalog.WeaponLevels[loadout.WeaponId][loadout.WeaponLevel - 1] with {},"primary",effects),
+            StatLimits.Apply(catalog.WeaponLevels["mine"][loadout.MineLevel - 1] with {},"mines",effects),
+            StatLimits.Apply(new MechanicsStats(Flags:catalog.Skills.Mechanics(loadout.SkillRanks)),"mechanics",effects));
     }
 }

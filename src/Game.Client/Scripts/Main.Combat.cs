@@ -27,17 +27,18 @@ public partial class Main
             if (r.Respawn <= 0)
             {
                 var p = track.GatePoint(r.Progress.LastCheckpoint) + track.GateDirection(r.Progress.LastCheckpoint) * 2 + Vector3.Up;
-                car.ResetAt(p, track.YawAt(r.Progress.LastCheckpoint)); car.Health = car.Stats.MaxHealth; r.Invulnerable = 2; Refill(r);
+                car.ResetAt(p, track.YawAt(r.Progress.LastCheckpoint)); car.Health = car.Stats.MaxHealth; r.Invulnerable = 2 + r.Build.Mechanics.ProtectionBonus; Refill(r);
                 Emit("respawn", r.Info.Id, 0, p, Vector3.Zero);
             }
             return;
         }
         car.Command = r.Gate.Read(now); car.Driving = phase == RacePhase.Racing && !r.Progress.Finished;
         car.SurfaceGrip = track.SurfaceGrip(car.GlobalPosition);
-        car.TurretYaw = Mathf.RotateToward(car.TurretYaw, car.Command.AimYaw, dt * car.Stats.TurretTraverseSpeed);
-        r.Energy = Mathf.Min(100, r.Energy + r.Build.Primary.EnergyRegen * dt); r.Heat = Mathf.Max(0, r.Heat - r.Build.Primary.CoolingRate * dt);
+        car.TurretYaw = Mathf.RotateToward(car.TurretYaw, car.Command.AimYaw, dt * car.Stats.TurretTraverseSpeed * (r.SlowRemaining > 0 ? .65f : 1));
+        r.Energy = Mathf.Min(100, r.Energy + r.Build.Primary.EnergyRegen * dt); r.Heat = Mathf.Max(0, r.Heat - r.Build.Primary.CoolingRate * (car.Command.Handbrake && r.Build.Mechanics.Flags.HasFlag(MechanicsFlags.DriftCooling) ? r.Build.Mechanics.DriftCoolingMultiplier : 1) * dt);
         if (r.Heat < r.Build.Primary.OverheatResume && r.Overheated) { r.Overheated = false; if (r.Info.Id == localId) ui.Notice("LASER GOTOWY", 2); }
         if (!car.Driving) { r.PreviousPosition = car.GlobalPosition; return; }
+        UpdateMechanics(r,dt);
         CheckGateCrossing(r);
         if (car.GlobalPosition.Y < -5 || car.GlobalPosition.Length() > 150) { Destroy(r); return; }
         if (car.LinearVelocity.Length() < 1.4f && (r.Info.Bot || autoPlay)) r.Unstuck += dt; else r.Unstuck = 0;
@@ -141,7 +142,7 @@ public partial class Main
                     var offset = r.Car.GlobalPosition - position; float distance = offset.Length();
                     if (distance > def.SplashRadius || r.Respawn > 0) continue;
                     float falloff = 1 - distance / def.SplashRadius;
-                    Damage(r, def.Damage * falloff, (offset.Normalized() + Vector3.Up * .55f).Normalized() * def.KnockbackForce * falloff, projectile.Owner);
+                    Damage(r, def.Damage * falloff, (offset.Normalized() + Vector3.Up * .55f).Normalized() * def.KnockbackForce * falloff, projectile.Owner, def.ArmorPenetration);
                 }
                 if (def.Perks.HasFlag(WeaponPerkFlags.EmpField)) Emit("emp", projectile.Owner, 0, position, Vector3.Zero, def.SplashRadius, def);
                 Emit("explosion", projectile.Owner, projectile.Id, position, Vector3.Zero, def.SplashRadius);
@@ -153,7 +154,7 @@ public partial class Main
     {
         if (r.Respawn > 0 || r.Invulnerable > 0 || r.Progress.Finished || phase != RacePhase.Racing) return;
         float actualDamage = Mathf.Min(r.Car.Health, amount * (1 - r.Car.Stats.Armor * (1 - armorPenetration)));
-        r.Car.Health -= actualDamage;
+        r.Car.Health -= actualDamage; r.LastDamage = now;
         r.Car.ApplyCentralImpulse(impulse * (1 - r.Car.Stats.KnockbackResistance));
         Emit("hit", attacker, r.Info.Id, r.Car.GlobalPosition + Vector3.Up * .5f, Vector3.Zero, actualDamage);
         if (r.Car.Health <= 0) Destroy(r);
@@ -163,6 +164,12 @@ public partial class Main
         if (r.Respawn > 0) return;
         destructions++; r.Car.Health = 0; r.Respawn = 2.5f; r.Car.Driving = false;
         Emit("destroy", r.Info.Id, 0, r.Car.GlobalPosition, Vector3.Zero);
+        if (r.Build.Mechanics.Flags.HasFlag(MechanicsFlags.EmergencyMine))
+        {
+            var old = ordnance.FirstOrDefault(p => p.Mine && p.Owner == r.Info.Id);
+            if (ordnance.Count(p => p.Mine && p.Owner == r.Info.Id) >= r.Build.Mines.MaxActive && old is not null) Emit("expire",r.Info.Id,old.Id,old.Node.Position,Vector3.Zero);
+            Emit("mine",r.Info.Id,++projectileSequence,r.Car.GlobalPosition - Vector3.Up * .6f,Vector3.Zero);
+        }
     }
     private void CheckGateCrossing(Racer r)
     {
@@ -175,6 +182,8 @@ public partial class Main
         if (!CheckpointGeometry.CrossesForward(Art.Numerics(previous), Art.Numerics(position), Art.Numerics(center), Art.Numerics(forward), catalog.Track.Width / 2 + .5f, 5)) return;
         if (!r.Progress.Pass(gate, (after - before) * 60, raceElapsed)) return;
         checkpointPasses++;
+        if (r.Build.Mechanics.Flags.HasFlag(MechanicsFlags.CheckpointAmmo))
+            r.Ammo = Math.Min(r.Build.Primary.AmmoCapacity,r.Ammo + Math.Max(1,(int)(r.Build.Primary.AmmoCapacity*r.Build.Mechanics.CheckpointAmmoFraction)));
         Emit("checkpoint", r.Info.Id, gate, car.GlobalPosition, Vector3.Zero, r.Progress.CompletedLaps);
         if (r.Progress.Finished) clock.NotifyFinish();
     }
@@ -183,6 +192,8 @@ public partial class Main
     {
         if (weapon is null && kind == "mine" && racers.TryGetValue(actor, out var owner)) weapon = owner.Build.Mines;
         var e = new RaceEvent(raceId, ++eventSequence, kind, actor, target, Art.Numerics(position), Art.Numerics(end), value, weapon);
+        if (kind == "mine" && racers.TryGetValue(actor,out var jammer) && jammer.Build.Mechanics.Flags.HasFlag(MechanicsFlags.TurretJam))
+            e = e with { Weapon = weapon! with { Perks = weapon.Perks | WeaponPerkFlags.EmpField } };
         ApplyEvent(e); Send(0, PacketCodec.EncodeJson(PacketKind.Event, e), true, 0);
     }
 }

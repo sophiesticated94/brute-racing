@@ -27,7 +27,7 @@ try {
     $processes += Start-GameProcess 'host' $hostArgs
     Start-Sleep -Milliseconds 1800
     for ($clientIndex = 1; $clientIndex -le $Clients; $clientIndex++) {
-        $processes += Start-GameProcess "client$clientIndex" @('--join=127.0.0.1','--probe-authority')
+        $processes += Start-GameProcess "client$clientIndex" @('--join=127.0.0.1','--probe-authority','--probe-builds')
     }
     $deadline = [DateTime]::UtcNow.AddSeconds(230 * $Rounds)
     while (@($processes | Where-Object { !$_.Process.HasExited }).Count -gt 0) {
@@ -42,6 +42,7 @@ try {
     }
     $hostReport = Get-Content -LiteralPath (Join-Path $testRoot 'host.json') -Raw | ConvertFrom-Json
     if (!$hostReport.success -or $hostReport.phase -ne 'Podium' -or $hostReport.checkpointPasses -lt 36) { throw 'Host nie ukończył poprawnego wyścigu.' }
+    if ($hostReport.rejectedBuilds -lt 5 * $Clients) { throw 'Host nie odrzucił wszystkich sfałszowanych buildów.' }
     foreach ($entry in $processes | Where-Object Name -NE 'host') {
         $clientReport = Get-Content -LiteralPath (Join-Path $testRoot ($entry.Name + '.json')) -Raw | ConvertFrom-Json
         if (!$clientReport.success -or $clientReport.receivedSnapshots -lt 30 -or ($hostReport.ranking -join ',') -ne ($clientReport.ranking -join ',')) { throw "Niezgodna klasyfikacja: $($entry.Name)" }

@@ -18,6 +18,9 @@ public partial class Main : Node3D
         public int Ammo, Mines;
         public bool Overheated;
         public float Unstuck;
+        public float DriftCharge, BoostRemaining;
+        public bool WasDrifting;
+        public double LastDamage = double.NegativeInfinity;
         public Vector3 PreviousPosition = car.Position;
         public VehicleState? NetworkState;
         public readonly List<(double Time, VehicleState State)> History = [];
@@ -120,6 +123,9 @@ public partial class Main : Node3D
             BuildWorld();
             ui = new GameUi(); AddChild(ui); audio = new GameAudio(); AddChild(audio);
             ui.ConfigureMap(track.Path);
+            ui.BalanceChanged += mode => SetBalance(mode);
+            if (arguments.TryGetValue("balance", out var balance)) SetBalance(balance.ToLowerInvariant() switch { "faircap" => LobbyBalanceMode.FairCap, "open" or "openmayhem" => LobbyBalanceMode.OpenMayhem, _ => LobbyBalanceMode.Stock });
+            else if (arguments.ContainsKey("weapon-level") || arguments.ContainsKey("mine-level")) SetBalance(LobbyBalanceMode.OpenMayhem);
             ui.SoloRequested += StartSolo; ui.HostRequested += StartHosting; ui.JoinRequested += JoinHost;
             ui.ReadyRequested += ToggleReady; ui.StartRequested += TryStartRace; ui.LeaveRequested += () => Leave("Sesja zakończona.");
             ui.ReplayRequested += () => { if (isHost) StartRace(); }; ui.LoadoutChanged += ChangeLoadout;
@@ -134,7 +140,7 @@ public partial class Main : Node3D
         catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
 
-    private PlayerLoadoutDto SelectedLoadout() => new("rook", ui.WeaponId, arguments.TryGetValue("weapon-level", out var level) ? Math.Clamp(int.Parse(level), 1, 5) : 1, new(), arguments.TryGetValue("mine-level", out var mine) ? Math.Clamp(int.Parse(mine), 1, 5) : 1);
+    private PlayerLoadoutDto SelectedLoadout() => ValidateBuild(RequestedLoadout(),(int)ui.Paint.Selected,true) ?? PlayerLoadoutDto.Default;
     private string SelectedName() => string.IsNullOrWhiteSpace(ui.PlayerName.Text) ? "Kierowca" : ui.PlayerName.Text.Trim();
     private void StartSolo()
     {
@@ -193,7 +199,7 @@ public partial class Main : Node3D
     private void PublishLobby()
     {
         if (!inSession) return;
-        var all = players.Values.ToArray(); ui.ShowLobby(all, isHost, localId); SendControl(0, new("lobby", Players: all));
+        var all = players.Values.ToArray(); ui.ShowLobby(all, isHost, localId); ui.ShowBalance(balanceRules,isHost); SendControl(0, new("lobby", Players: all, BalanceRules: balanceRules));
     }
     private void TryStartRace()
     {
@@ -204,7 +210,7 @@ public partial class Main : Node3D
     {
         if (!isHost) return;
         raceId++;
-        SendControl(0, new("start", Players: players.Values.ToArray(), RaceId: raceId));
+        SendControl(0, new("start", Players: players.Values.ToArray(), RaceId: raceId, BalanceRules: balanceRules));
         InitializeRace();
     }
     private void InitializeRace()
@@ -344,7 +350,7 @@ public partial class Main : Node3D
     private void LeaveInternal()
     {
         transport?.Dispose(); transport = null; inSession = false; phase = RacePhase.Lobby;
-        players.Clear(); acceptedHello.Clear(); delayed.Clear(); finalRanking = []; if (raceRoot is not null) ClearRace();
+        players.Clear(); acceptedHello.Clear(); sentBuildProbes = false; delayed.Clear(); finalRanking = []; if (raceRoot is not null) ClearRace();
     }
     private void Leave(string message) { LeaveInternal(); ui.ShowMenu(); ui.Notice(message, 7); GD.Print(message); }
     private void WriteResults(bool success)
@@ -354,7 +360,7 @@ public partial class Main : Node3D
         var report = new
         {
             success, host = isHost, localId, tick, phase = phase.ToString(), elapsed = raceElapsed,
-            ranking = Ranking(), receivedSnapshots, shots, destructions, checkpointPasses,
+            ranking = Ranking(), receivedSnapshots, shots, destructions, checkpointPasses, rejectedBuilds,
             simulatedFps = frameTotal > 0 ? frameCount / frameTotal : 0,
             averageFps = wallFrameTotal > 0 ? (frameCount - 1) / wallFrameTotal : 0, worstFrameMs = wallWorstFrame * 1000,
             rounds = roundReports, events = eventCounts,
