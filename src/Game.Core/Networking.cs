@@ -12,6 +12,7 @@ public readonly record struct PlayerInputCommand(uint Sequence, uint TickNumber,
     public bool IsValid => Sequence > 0 && float.IsFinite(Steering) && float.IsFinite(Throttle) &&
         float.IsFinite(Brake) && float.IsFinite(AimYaw) && Math.Abs(Steering) <= 1 &&
         Math.Abs(Throttle) <= 1 && Brake is >= 0 and <= 1 && Math.Abs(AimYaw) <= MathF.PI;
+    public override string ToString()=>$"Input {Sequence}/{TickNumber}: steer={Steering}, throttle={Throttle}, brake={Brake}, aim={AimYaw}, drift={Handbrake}, fire={Fire}, mine={Mine}";
     public PlayerInputCommand Neutral => this with { Steering = 0, Throttle = 0, Brake = 1, Fire = false, Mine = false };
 }
 
@@ -35,12 +36,13 @@ public sealed record VehicleState(int Id, Vector3 Position, Quaternion Rotation,
 
 public sealed record WorldSnapshot(uint RaceId, uint Tick, RacePhase Phase, double Elapsed, float Remaining, VehicleState[] Vehicles);
 public sealed record RaceEvent(uint RaceId, long EventId, string Kind, int Actor, int Target, Vector3 Position, Vector3 End, float Value, WeaponDefinition? Weapon = null);
-public sealed record LobbyPlayer(int Id, string Name, int Color, bool Ready, bool Bot, PlayerLoadoutDto Loadout);
-public sealed record SessionMessage(string Kind, int Protocol = 3, string ContentHash = "",
+public sealed record LobbyPlayer(int Id, string Name, int Color, bool Ready, bool Bot, PlayerLoadoutDto Loadout,Guid ParticipantId=default);
+public sealed record SessionMessage(string Kind, int Protocol = 4, string ContentHash = "",
     string Name = "", int Color = 0, PlayerLoadoutDto? Loadout = null,
     LobbyPlayer[]? Players = null, string Message = "", int[]? Ranking = null, uint RaceId = 0, double SentTime = 0,
     LobbyBalanceRules? BalanceRules = null, GameMode Mode = GameMode.Exhibition,
-    CampaignView? Campaign = null, Guid SessionId = default, RewardReceipt? Reward = null, string ItemId = "", string CosmeticId = "stock", Guid MatchId=default, Guid TicketId=default);
+    CampaignView? Campaign = null, Guid SessionId = default, RewardReceipt? Reward = null, string ItemId = "", string CosmeticId = "stock", Guid MatchId=default, Guid TicketId=default,Guid ProfileId=default,Guid ParticipantId=default,Guid CampaignId=default,
+    CampaignCredential? Credential=null,CampaignChallenge? Challenge=null,string Proof="",Guid RequestId=default,long Revision=0);
 
 public interface INetworkTransport : IDisposable
 {
@@ -59,11 +61,11 @@ public interface INetworkTransport : IDisposable
 public static class PacketCodec
 {
     public const int MaxPacketBytes = 32768;
-    public static byte[] EncodeInputs(IReadOnlyList<PlayerInputCommand> commands)
+    public static byte[] EncodeInputs(IReadOnlyList<PlayerInputCommand> commands,uint raceId=0)
     {
         if (commands.Count is < 1 or > 3) throw new ArgumentOutOfRangeException(nameof(commands));
         using var stream = new MemoryStream(96); using var w = new BinaryWriter(stream);
-        w.Write((byte)PacketKind.Input); w.Write((byte)commands.Count);
+        w.Write((byte)PacketKind.Input); w.Write((byte)commands.Count);w.Write(raceId);
         foreach (var c in commands)
         {
             w.Write(c.Sequence); w.Write(c.TickNumber); w.Write(c.Steering); w.Write(c.Throttle);
@@ -72,11 +74,13 @@ public static class PacketCodec
         }
         return stream.ToArray();
     }
-    public static PlayerInputCommand[] DecodeInputs(byte[] bytes)
+    public static PlayerInputCommand[] DecodeInputs(byte[] bytes)=>DecodeInputBatch(bytes).Commands;
+    public static (uint RaceId,PlayerInputCommand[] Commands) DecodeInputBatch(byte[] bytes)
     {
         using var r = Reader(bytes, PacketKind.Input);
         int count = r.ReadByte();
-        if (count is < 1 or > 3 || bytes.Length != 2 + count * 25) throw new InvalidDataException("Input size.");
+        if (count is < 1 or > 3 || bytes.Length != 6 + count * 25) throw new InvalidDataException("Input size.");
+        uint raceId=r.ReadUInt32();
         var result = new PlayerInputCommand[count];
         for (var i = 0; i < count; i++)
         {
@@ -87,7 +91,7 @@ public static class PacketCodec
             if (flags > 7 || !c.IsValid) throw new InvalidDataException("Input values.");
             result[i] = c;
         }
-        return result;
+        return (raceId,result);
     }
     public static byte[] EncodeSnapshot(WorldSnapshot s)
     {

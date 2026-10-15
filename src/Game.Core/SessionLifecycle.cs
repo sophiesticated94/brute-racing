@@ -19,7 +19,7 @@ public sealed class SessionLifecycle
             (SessionState.Racing,SessionState.Podium or SessionState.CampaignComplete)=>true,
             (SessionState.Podium,SessionState.Intermission or SessionState.Countdown or SessionState.CampaignComplete)=>true,
             (SessionState.Lobby,SessionState.Intermission or SessionState.CampaignComplete)=>true,
-            (SessionState.CampaignComplete,SessionState.Intermission)=>true,
+            (SessionState.CampaignComplete,SessionState.Intermission or SessionState.Lobby)=>true,
             _=>false
         };
         if(!legal)throw new InvalidOperationException($"Niedozwolone przejście sesji: {State} → {next}.");

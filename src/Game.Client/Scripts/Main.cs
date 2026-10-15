@@ -136,7 +136,8 @@ public partial class Main : Node3D
             if (arguments.TryGetValue("bots", out var bots)) ui.Bots.Value = Math.Clamp(int.Parse(bots), 0, 7);
             if (arguments.TryGetValue("weapon", out var weapon)) ui.Weapon.Select(weapon == "laser" ? 1 : weapon == "rocket" ? 2 : 0);
             if (arguments.TryGetValue("name", out var name)) ui.PlayerName.Text = name;
-            if(gameMode==GameMode.Quick)StartQuick();
+            if(arguments.TryGetValue("resume-campaign",out var resume))ResumeCampaign(Guid.Parse(resume));
+            else if(gameMode==GameMode.Quick)StartQuick();
             else if (arguments.TryGetValue("join", out var address)) { ui.Address.Text = address; JoinHost(); }
             else if (arguments.ContainsKey("host")) StartHosting();
             else if (smoke || arguments.ContainsKey("solo")) StartSolo();
@@ -202,10 +203,10 @@ public partial class Main : Node3D
         if (isHost && players.TryGetValue(localId, out var p))
         {
             var build=SelectedLoadout();
-            if(campaign is not null && !campaign.TrySetLoadout(localId,build,balanceRules,out _))return;
+            if(campaign is not null && !CommitCampaign(Guid.NewGuid(),state=>{if(!state.TrySetLoadout(localId,build,balanceRules,out _))return false;state.Appearance(localId,CleanName(SelectedName()),(int)ui.Paint.Selected);return true;}))return;
             players[localId] = p with { Name = SelectedName(), Color = (int)ui.Paint.Selected, Loadout = build, Ready = false }; PublishLobby();
         }
-        else SendControl(1, new("loadout", Name: SelectedName(), Color: (int)ui.Paint.Selected, Loadout: SelectedLoadout()));
+        else SendControl(1, new("loadout", Name: SelectedName(), Color: (int)ui.Paint.Selected, Loadout: SelectedLoadout(),RequestId:Guid.NewGuid()));
     }
     private void ToggleReady()
     {
@@ -228,6 +229,7 @@ public partial class Main : Node3D
     private void StartRace()
     {
         if (!isHost) return;
+        if(!CampaignCanStart()){PublishLobby();return;}
         raceId++; raceSessionId=Guid.NewGuid();
         SendControl(0, new("start", Players: players.Values.ToArray(), RaceId: raceId, BalanceRules: balanceRules));
         InitializeRace();
@@ -272,7 +274,8 @@ public partial class Main : Node3D
     private void PhysicsTick(double delta)
     {
         if (catalog is null) return;
-        now += delta; transport?.Poll(); FlushDelayed();UpdateQuick();SyncSessionState();
+        now += delta; transport?.Poll(); FlushDelayed();UpdateQuick();TickCampaignPersistence();SyncSessionState();
+        if(arguments.ContainsKey("input-smoke")){try{RunInputSmoke();}catch(Exception e){GD.PushError(e.ToString());GetTree().Quit(4);}return;}
         if(isHost)foreach(var peer in acceptedHello.Where(p=>now-p.Value>10).Select(p=>p.Key).ToArray()){transport?.Disconnect(peer);HandlePeerLost(peer);}
         if (inSession && !isHost && transport is not null && now >= nextPing)
         { nextPing = now + 1; SendControl(1, new("ping", SentTime: now)); }
@@ -280,8 +283,8 @@ public partial class Main : Node3D
         {
             GD.PushError("SMOKE_TIMEOUT"); WriteResults(false); GetTree().Quit(2); return;
         }
-        if (inSession && !isHost && now - lastServerPacket > 10) { if(queueTicket is not null&&phase==RacePhase.Lobby)RetryQuick();else Leave("Brak odpowiedzi gospodarza (10 s)."); return; }
-        if (isHost && phase == RacePhase.Lobby && autoStart && now >= autoStartAt && players.Values.Count(p => !p.Bot) >= expectedPlayers)
+        if (inSession && !isHost && now - lastServerPacket > 10) { if(queueTicket is not null&&phase==RacePhase.Lobby)RetryQuick();else DisconnectSession("Brak odpowiedzi gospodarza (10 s)."); return; }
+        if (isHost && phase == RacePhase.Lobby && autoStart && CampaignCanStart() && now >= autoStartAt && players.Values.Count(p => !p.Bot) >= expectedPlayers)
         {
             foreach (var id in players.Keys.ToArray()) players[id] = players[id] with { Ready = true };
             TryStartRace();
@@ -296,7 +299,7 @@ public partial class Main : Node3D
             {
                 local.Car.Command = command;
                 recentInputs.Enqueue(command); while (recentInputs.Count > 3) recentInputs.Dequeue();
-                Send(1, PacketCodec.EncodeInputs(recentInputs.ToArray()), false, 1);
+                Send(1, PacketCodec.EncodeInputs(recentInputs.ToArray(),raceId), false, 1);
                 if (phase == RacePhase.Racing && local.Car.Health > 0)
                 {
                     float a = Mathf.Atan2(local.Car.GlobalPosition.X / catalog.Track.RadiusX, local.Car.GlobalPosition.Z / catalog.Track.RadiusZ);
@@ -330,7 +333,7 @@ public partial class Main : Node3D
             if (tick % 2 == 0 && transport is not null) Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), false, 2);
         }
         else UpdateOrdnance((float)delta);
-        if (phase == RacePhase.Podium && smoke && finalRanking.Length > 0 && !roundRecorded)
+        if (phase == RacePhase.Podium && smoke && finalRanking.Length > 0 && !roundRecorded && !pendingRaceFinalization && CampaignRewardsReceived())
         {
             roundRecorded = true; completedRaces++;
             roundReports.Add(new { raceId, ranking = finalRanking, events = new Dictionary<string, int>(eventCounts) });
@@ -360,10 +363,10 @@ public partial class Main : Node3D
     }
     private void FinishRace()
     {
-        finalRanking = Ranking(); AwardRace(); Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), false, 2);
+        finalRanking = Ranking(); pendingRaceFinalization=!AwardRace();if(pendingRaceFinalization)return; Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), false, 2);
         // Final state is reliable, so the podium does not depend on the last unreliable snapshot.
         Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), true, 0);
-        SendControl(0, new("results", Ranking: finalRanking, RaceId: raceId));  ShowPodium();
+        SendControl(0, new("results", Ranking: finalRanking, RaceId: raceId)); nextRewardDelivery=0;TickCampaignPersistence(); ShowPodium();
         GD.Print("RACE_FINISH ranking=" + string.Join(',', finalRanking));
     }
     private void ClearRace()
@@ -375,12 +378,14 @@ public partial class Main : Node3D
     private void LeaveInternal()
     {
         lifecycle.Reset();gameplayInput.Reset();
+        durableCampaign=null;campaignAuth.Clear();campaignIdentityReady.Clear();pendingCampaignHellos.Clear();pendingIdentity=null;pendingRaceFinalization=false;nextCampaignRetry=nextRewardDelivery=0;
         transport?.Dispose(); transport = null; inSession = false; phase = RacePhase.Lobby;
         players.Clear(); seenEvents.Clear();eventCounts.Clear();aimLine=null;nextAimLine=0;
         lastSnapshotTick=0;localSequence=0;nextPing=0;
         players.Clear(); acceptedHello.Clear(); sentBuildProbes = false; campaign=null;campaignView=null;garage?.Close(); delayed.Clear(); finalRanking = []; if (raceRoot is not null) ClearRace();
     }
-    private void Leave(string message) { CancelQuick();SaveProfile(); LeaveInternal(); ui.ShowMenu(); ui.Notice(message, 7); GD.Print(message); }
+    private void DisconnectSession(string message){Leave(message);lifecycle.Reset(SessionState.Disconnected);}
+    private void Leave(string message) { CancelQuick();SaveProfile(); LeaveInternal(); ui.ShowMenu();ui.SetCampaignSaves(campaignRepository?.List(profile.PlayerId).ToArray()??[]); ui.Notice(message, 7); GD.Print(message); }
     private void WriteResults(bool success)
     {
         resultsWritten = true;

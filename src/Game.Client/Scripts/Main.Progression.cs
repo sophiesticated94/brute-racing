@@ -22,6 +22,7 @@ public partial class Main
             profileRepository=new(catalog,file);profile=profileRepository.Load(out string warning);if(warning.Length>0)ui.Notice(warning,10);
         }
         if(arguments.TryGetValue("preset",out var preset))profile.SelectedPreset=Math.Clamp(int.Parse(preset)-1,0,2);
+        InitializeCampaignStorage();
         ui.PlayerName.Text=profile.Name;ui.Paint.Select(profile.Paint);ui.UpdatePresets(profile);
         ui.DirectoryUrl.Text=System.Environment.GetEnvironmentVariable("MCM_DIRECTORY_URL")??"";
         garage=new GarageScreen();AddChild(garage);garage.Configure(catalog);garage.Command+=GarageCommand;
@@ -30,29 +31,42 @@ public partial class Main
         ui.GarageRequested+=OpenGarage;ui.PresetSelected+=slot=>SelectPreset(slot);
         if(gameMode==GameMode.Campaign)SetBalance(LobbyBalanceMode.OpenMayhem);
     }
-    private void SaveProfile()
+    private bool SaveProfile()
     {
-        try{profile.Name=CleanName(ui.PlayerName.Text);profile.Paint=(int)ui.Paint.Selected;profileRepository?.Save(profile);}
+        try{profile.Name=CleanName(ui.PlayerName.Text);profile.Paint=(int)ui.Paint.Selected;profileRepository?.Save(profile);return true;}
         catch(Exception e) when(e is IOException or UnauthorizedAccessException or InvalidDataException)
-        {ui.Notice("Nie udało się zapisać profilu: "+e.Message,8);garage?.Notify("Nie udało się zapisać profilu.");}
+        {ui.Notice("Nie udało się zapisać profilu: "+e.Message,8);garage?.Notify("Nie udało się zapisać profilu.");return false;}
     }
     private void LaunchCampaignSolo(){CancelQuick();gameMode=GameMode.Campaign;SetBalance(LobbyBalanceMode.OpenMayhem);StartSolo();}
     private void LaunchCampaignHost(){CancelQuick();gameMode=GameMode.Campaign;SetBalance(LobbyBalanceMode.OpenMayhem);StartHosting();}
     private void LaunchCampaignJoin(){CancelQuick();gameMode=GameMode.Campaign;JoinHost();}
-    private void EnsureCampaign()
+    private void EnsureCampaign(Dictionary<int,Guid>? continuingProfiles=null)
     {
         if(gameMode!=GameMode.Campaign || campaign is not null)return;
         int length=arguments.TryGetValue("campaign-races",out var n)?Math.Clamp(int.Parse(n),3,10):(int)ui.CampaignLength.Value;
         campaign=new(catalog,length,players.Values.Select(p=>(p.Id,p.Loadout)));
+        campaign.Configure(profile.PlayerId,balanceRules);
+        foreach(var p in players.Values)campaign.Describe(p.Id,CleanName(p.Name),p.Color,p.Bot);
+        if(!dedicated)
+        {
+            var credential=campaign.Register(localId,profile.PlayerId);profile.CampaignCredentials[campaign.Id]=credential;
+            if(SaveProfile()){campaign.Confirm(localId);campaignIdentityReady.Add(localId);}
+        }
+        var welcomes=new Dictionary<int,CampaignCredential>();
+        foreach(var p in players.Values.Where(p=>!p.Bot&&p.Id!=localId))
+        {if(continuingProfiles is null||!continuingProfiles.TryGetValue(p.Id,out var identity))throw new InvalidOperationException("Brak tożsamości uczestnika nowej kampanii.");welcomes[p.Id]=campaign.Register(p.Id,identity);}
+        durableCampaign=new(campaign,campaignRepository is null?null:campaignRepository.Save);
+        durableCampaign.Initialize();
         if(smoke){requiredRounds=length;if(!arguments.ContainsKey("timeout"))maxSeconds=length*210;}
         SynchronizeCampaign();
+        foreach(var welcome in welcomes)SendControl(welcome.Key,new("campaign_welcome",CampaignId:campaign.Id,Credential:welcome.Value,Revision:campaign.Revision));
     }
     private void SynchronizeCampaign()
     {
         if(campaign is null)return;
-        campaign.Synchronize(players.Values.Select(p=>(p.Id,p.Loadout)));
+
         foreach(var p in players.Values.ToArray())
-            if(campaign.Players.TryGetValue(p.Id,out var state))players[p.Id]=p with{Loadout=ValidateBuild(state.Loadout,p.Color)!};
+            if(campaign.Players.TryGetValue(p.Id,out var state))players[p.Id]=p with{Loadout=ValidateBuild(state.Loadout,p.Color)!,ParticipantId=state.ParticipantId};
         campaignView=campaign.View();ui.ShowCampaign(campaignView,localId);RefreshGarage();
     }
     private GarageContext GarageContext()
@@ -71,7 +85,7 @@ public partial class Main
         {
             var archived=profile.Presets[profile.SelectedPreset].Loadout;
             if(isHost)ApplyCampaignBuild(localId,archived);
-            else SendControl(1,new("loadout",Name:SelectedName(),Color:(int)ui.Paint.Selected,Loadout:archived));
+            else SendControl(1,new("loadout",Name:SelectedName(),Color:(int)ui.Paint.Selected,Loadout:archived,RequestId:Guid.NewGuid()));
         }
         RefreshGarage();
     }
@@ -93,36 +107,33 @@ public partial class Main
         }
         if(gameMode!=GameMode.Campaign || phase!=RacePhase.Lobby){garage.Notify("Rozwijaj build w garażu między wyścigami kampanii.");return;}
         if(isHost)HandleCampaignAction(localId,kind,item);
-        else SendControl(1,new("campaign_action",Message:kind,ItemId:item));
+        else SendControl(1,new("campaign_action",Message:kind,ItemId:item,RequestId:Guid.NewGuid()));
     }
     private bool ApplyCampaignBuild(int playerId,PlayerLoadoutDto build)
     {
-        if(campaign is null || !campaign.TrySetLoadout(playerId,build,balanceRules,out string error))return false;
+        if(campaign is null || !CommitCampaign(Guid.NewGuid(),s=>s.TrySetLoadout(playerId,build,balanceRules,out _)))return false;
         SynchronizeCampaign();if(players.ContainsKey(playerId))players[playerId]=players[playerId] with{Ready=false};PublishLobby();return true;
     }
-    private void HandleCampaignAction(int playerId,string kind,string item)
+    private void HandleCampaignAction(int playerId,string kind,string item,Guid request=default)
     {
-        if(campaign is null || phase!=RacePhase.Lobby || campaign.Complete || !campaign.Players.TryGetValue(playerId,out var own))return;
-        bool success=false;string error="Brak kredytów lub niespełnione wymagania.";
-        switch(kind)
-        {
-            case "buy":success=campaign.TryPurchase(playerId,item);break;
-            case "rank":success=campaign.TryRank(playerId,item,balanceRules,out error);break;
-            case "respec":campaign.Respec(playerId);success=true;break;
-            case "equip":
-                if(own.OwnedLevels.TryGetValue(item,out int level) && item!="mine")success=campaign.TrySetLoadout(playerId,own.Loadout with{WeaponId=item,WeaponLevel=level},balanceRules,out error);
-                break;
-        }
+        if(campaign is null || phase!=RacePhase.Lobby || campaign.Complete || !campaign.Players.TryGetValue(playerId,out var own) || !campaignIdentityReady.Contains(playerId))return;
+        if(request==Guid.Empty)request=Guid.NewGuid();
+        string error="Brak kredytów lub niespełnione wymagania.";
+        bool success=CommitCampaign(request,s=>kind switch{
+            "buy"=>s.TryPurchase(playerId,item),"rank"=>s.TryRank(playerId,item,balanceRules,out error),
+            "respec"=>Respec(s,playerId),"equip"=>own.OwnedLevels.TryGetValue(item,out int level)&&item!="mine"&&s.TrySetLoadout(playerId,own.Loadout with{WeaponId=item,WeaponLevel=level},balanceRules,out error),_=>false});
         if(!success)
-        {if(playerId==localId)garage.Notify(error);else SendControl(playerId,new("build_error",Message:error));return;}
+        {error=durableCampaign?.SaveBlocked==true?"Błąd zapisu kampanii. Operacja nie została zatwierdzona.":error;if(playerId==localId)garage.Notify(error);else SendControl(playerId,new("build_error",Message:error));return;}
         players[playerId]=players[playerId] with{Ready=false};SynchronizeCampaign();PublishLobby();
+        if(playerId!=localId)SendControl(playerId,new("campaign_action_ack",RequestId:request,Revision:campaign.Revision));
     }
+    private static bool Respec(CampaignState state,int player){state.Respec(player);return true;}
     private void AutoSpendCampaign(int id)
     {
         if(campaign is null || campaign.Complete)return;
         var own=campaign.Players[id];
-        while(campaign.TryPurchase(id,own.Loadout.WeaponId)){}
-        while(campaign.TryPurchase(id,"mine")){}
+        while(CommitCampaign(Guid.NewGuid(),s=>s.TryPurchase(id,own.Loadout.WeaponId))){}
+        while(CommitCampaign(Guid.NewGuid(),s=>s.TryPurchase(id,"mine"))){}
         var goal=catalog.BotArchetypes[Math.Abs(id%5)].Loadout;
         string branch=catalog.Skills.Nodes[goal.SkillRanks.Keys.First()].Branch;
         bool bought=true;
@@ -130,7 +141,7 @@ public partial class Main
         {
             bought=false;
             foreach(var node in catalog.Skills.TopologicalOrder.Where(n=>catalog.Skills.Nodes[n].Branch==branch))
-                if(campaign.TryRank(id,node,balanceRules,out _)){bought=true;break;}
+                if(CommitCampaign(Guid.NewGuid(),s=>s.TryRank(id,node,balanceRules,out _))){bought=true;break;}
         }
     }
     private void BeginIntermission()
@@ -147,32 +158,28 @@ public partial class Main
         if(!isHost)return;
         if(gameMode==GameMode.Campaign)
         {
-            if(campaign?.Complete==true){campaign=null;EnsureCampaign();}
+            if(campaign?.Complete==true)
+            {
+                var profiles=campaign.Players.Where(p=>!p.Value.IsBot).ToDictionary(p=>p.Key,p=>p.Value.ProfileId);
+                campaign=null;campaignView=null;durableCampaign=null;campaignIdentityReady.Clear();campaignAuth.Clear();pendingCampaignHellos.Clear();EnsureCampaign(profiles);
+            }
             BeginIntermission();
         }
         else StartRace();
     }
-    private void AwardRace()
+    private bool AwardRace()
     {
         if(campaign is not null)
         {
-            campaign.RecordRace(raceSessionId,finalRanking,racers.ToDictionary(r=>r.Key,r=>r.Value.Progress.Finished),racers.ToDictionary(r=>r.Key,r=>new CombatScore(r.Value.Hits,r.Value.Kills)));
+            if(!CommitCampaign(raceSessionId,s=>{
+                bool applied=s.RecordRace(raceSessionId,finalRanking,racers.ToDictionary(r=>r.Key,r=>r.Value.Progress.Finished),racers.ToDictionary(r=>r.Key,r=>new CombatScore(r.Value.Hits,r.Value.Kills)));
+                if(applied)s.QueueRewards(raceSessionId);return applied;},true))return false;
             SynchronizeCampaign();
         }
-        foreach(var p in players.Values.Where(p=>!p.Bot))
-        {
-            DeliverReward(p.Id,new(raceSessionId,RewardKind.Race));
-            if(campaign?.Complete==true)
-            {
-                var own=campaign.Players[p.Id];
-                var archive=new ArchivedBuild($"Kanion {campaign.Length} • {catalog.Weapons[own.Loadout.WeaponId].Name}",own.Loadout,campaign.Id,DateTimeOffset.UtcNow);
-                DeliverReward(p.Id,new(campaign.Id,RewardKind.Campaign,campaign.RewardCoins(p.Id),archive));
-            }
-        }
+        else foreach(var p in players.Values.Where(p=>!p.Bot))DeliverReward(p.Id,new(raceSessionId,RewardKind.Race));
         if(campaign is not null && !campaign.Complete && !smoke)
-        {
-            uint epoch=raceId;ScheduleSession(3,()=>{if(epoch==raceId && phase==RacePhase.Podium)BeginIntermission();});
-        }
+        {uint epoch=raceId;ScheduleSession(3,()=>{if(epoch==raceId && phase==RacePhase.Podium)BeginIntermission();});}
+        return true;
     }
     private void DeliverReward(int target,RewardReceipt receipt)
     {
@@ -181,8 +188,19 @@ public partial class Main
     }
     private void AcceptReward(RewardReceipt receipt)
     {
-        if(receipt.Kind==RewardKind.Race && receipt.Id!=raceSessionId || receipt.Kind==RewardKind.Campaign && receipt.Id!=(campaign?.Id??campaignView?.Id))return;
-        ProfileRules.ApplyReward(catalog,profile,receipt);SaveProfile();RefreshGarage();
+        if(receipt.CampaignId!=Guid.Empty)
+        {
+            var view=campaign?.View()??campaignView;
+            if(view?.Id!=receipt.CampaignId || (receipt.Kind==RewardKind.Race?view.CompletedRaceIds?.Contains(receipt.Id)!=true:!view.Complete||receipt.Id!=view.Id))return;
+        }
+        else if(receipt.Kind!=RewardKind.Race || receipt.Id!=raceSessionId)return;
+        var staged=ProfileCodec.Decode(catalog,ProfileCodec.Encode(catalog,profile));
+        ProfileRules.ApplyReward(catalog,staged,receipt);
+        try{profileRepository?.Save(staged);profile=staged;RefreshGarage();}
+        catch(Exception e)when(e is IOException or UnauthorizedAccessException or InvalidDataException){ui.Notice("Nagroda oczekuje na zapis profilu.",5);return;}
+        if(receipt.CampaignId==Guid.Empty)return;
+        if(isHost)AcknowledgeCampaignReward(localId,receipt.Id);
+        else SendControl(1,new("reward_ack",CampaignId:receipt.CampaignId,SessionId:receipt.Id));
     }
     private void UpdateCampaignMessage(SessionMessage message)
     {

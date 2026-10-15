@@ -18,7 +18,7 @@ public partial class Main
             rejectedBuilds++; SendControl(sender,new("build_error",Message:"Odrzucono nieprawidłowy build."));
             GD.Print($"BUILD_REJECT peer={sender}"); return;
         }
-        if(campaign is not null && !campaign.TrySetLoadout(sender,loadout,balanceRules,out _))
+        if(campaign is not null && (message.RequestId==Guid.Empty || !CommitCampaign(message.RequestId,state=>{if(!state.TrySetLoadout(sender,loadout,balanceRules,out _))return false;state.Appearance(sender,CleanName(message.Name),message.Color);return true;})))
         {rejectedBuilds++;SendControl(sender,new("build_error",Message:"Brak wyposażenia lub punktów zdobytych w tej kampanii."));return;}
         players[sender] = player with { Name=CleanName(message.Name),Color=message.Color,Loadout=ValidateBuild(loadout,message.Color)!,Ready=false };
         PublishLobby();
@@ -44,8 +44,10 @@ public partial class Main
     }
     private void SetBalance(LobbyBalanceMode mode)
     {
-        if (inSession && (!isHost || gameMode==GameMode.Quick) || phase != RacePhase.Lobby) return;
-        balanceRules = mode switch { LobbyBalanceMode.Stock => LobbyBalanceRules.Stock, LobbyBalanceMode.FairCap => LobbyBalanceRules.FairCap, _ => LobbyBalanceRules.OpenMayhem };
+        if (inSession && (!isHost || gameMode==GameMode.Quick) || phase != RacePhase.Lobby || campaign?.Complete==true) return;
+        var desired = mode switch { LobbyBalanceMode.Stock => LobbyBalanceRules.Stock, LobbyBalanceMode.FairCap => LobbyBalanceRules.FairCap, _ => LobbyBalanceRules.OpenMayhem };
+        if(campaign is not null && !CommitCampaign(Guid.NewGuid(),s=>{s.Configure(s.OwnerProfileId,desired);foreach(var p in s.Players.Values)if(!s.TrySetLoadout(p.Id,p.Loadout,desired,out _))return false;return true;}))return;
+        balanceRules=desired;
         if (isHost && inSession)
         {
             foreach (var p in players.Values.ToArray())

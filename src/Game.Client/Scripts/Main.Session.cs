@@ -16,17 +16,17 @@ public partial class Main
         if(lifecycle.State is SessionState.Menu or SessionState.Disconnected)lifecycle.MoveTo(SessionState.Lobby);
         lifecycle.MoveTo(state);
     }
-    private void ScheduleSession(double delay,Action action,bool physics=false)
+    private void ScheduleSession(double delay,Action action,bool physics=false,bool guardRound=true)
     {
         long generation=lifecycle.Generation;uint round=raceId;
-        GetTree().CreateTimer(delay,false,physics).Timeout+=()=>{if(!shuttingDown&&lifecycle.IsCurrent(generation)&&raceId==round)action();};
+        GetTree().CreateTimer(delay,false,physics).Timeout+=()=>{if(!shuttingDown&&lifecycle.IsCurrent(generation)&&(!guardRound||raceId==round))action();};
     }
     private PlayerInputCommand LocalCommand(Racer racer,uint sequence)
     {
         bool fire=Input.IsMouseButtonPressed(MouseButton.Left),mine=Input.IsMouseButtonPressed(MouseButton.Right);
-        foreach(int pad in Input.GetConnectedJoypads())
+        foreach(int pad in LocalPads())
         {fire|=Input.IsJoyButtonPressed(pad,JoyButton.RightShoulder);mine|=Input.IsJoyButtonPressed(pad,JoyButton.LeftShoulder);}
-        bool focused=headless||GetWindow().HasFocus();
+        bool focused=inputSmokeFocus??(headless||GetWindow().HasFocus());
         gameplayInput.Observe(lifecycle.State,ui.BlockingInput||garage.IsBlockingInput,focused,fire,mine);
         var command=gameplayInput.CanRead?(autoPlay?BotInput(racer,sequence):ReadInput(racer,sequence)):
             new PlayerInputCommand(sequence,tick,0,0,1,racer.Car.TurretYaw,false,false,false);

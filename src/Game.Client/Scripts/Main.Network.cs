@@ -15,7 +15,7 @@ public partial class Main
             if (!isHost && id == 1)
             {
                 localId = net.LocalId;
-                SendControl(1, new("hello", ContentHash: contentHash, Name: SelectedName(), Color: (int)ui.Paint.Selected, Loadout: SelectedLoadout(),MatchId:quickOffer?.Id??Guid.Empty,TicketId:queueTicket?.Id??Guid.Empty));
+                SendControl(1, new("hello", ProfileId:profile.PlayerId, ContentHash: contentHash, Name: SelectedName(), Color: (int)ui.Paint.Selected, Loadout: SelectedLoadout(),MatchId:quickOffer?.Id??Guid.Empty,TicketId:queueTicket?.Id??Guid.Empty));
             }
             else if (isHost && phase != RacePhase.Lobby) net.Disconnect(id);
         };
@@ -25,7 +25,7 @@ public partial class Main
             if (!isHost && id == 1)
             {
                 if(queueTicket is not null&&phase==RacePhase.Lobby){RetryQuick();return;}
-                bool finishedSmoke=smoke&&resultsWritten;Leave("Gospodarz zakończył połączenie.");
+                bool finishedSmoke=smoke&&resultsWritten;DisconnectSession("Gospodarz zakończył połączenie.");
                 if (finishedSmoke||arguments.ContainsKey("exit-on-disconnect")) GetTree().Quit();
                 return;
             }
@@ -35,10 +35,10 @@ public partial class Main
     }
     private void HandlePeerLost(int id)
     {
-            acceptedHello.Remove(id);quickPeers.Remove(id);
+            acceptedHello.Remove(id);quickPeers.Remove(id);campaignAuth.Remove(id);pendingCampaignHellos.Remove(id);campaignIdentityReady.Remove(id);
             if (isHost && players.TryGetValue(id, out var p) && !p.Bot)
             {
-                if (phase == RacePhase.Lobby && campaign?.CompletedRounds is not >0) players.Remove(id);
+                if (phase == RacePhase.Lobby && campaign is null) players.Remove(id);
                 else
                 {
                     players[id] = p with { Bot = true, Ready = true, Name = p.Name + " · AI" };
@@ -61,9 +61,9 @@ public partial class Main
                 case PacketKind.Control: HandleControl(sender, PacketCodec.DecodeJson<SessionMessage>(packet, PacketKind.Control)); break;
                 case PacketKind.Input:
                     if (!isHost || phase is RacePhase.Lobby or RacePhase.Podium || !racers.TryGetValue(sender, out var r) || r.Info.Bot) return;
-                    var inputs = PacketCodec.DecodeInputs(packet);
+                    var inputs = PacketCodec.DecodeInputBatch(packet);if(inputs.RaceId!=raceId)return;
                     // Redundancy recovers the latest state, never executes multiple physics steps or shots per packet.
-                    foreach (var input in inputs) r.Gate.Accept(input, now);
+                    foreach (var input in inputs.Commands) r.Gate.Accept(input, now);
                     break;
                 case PacketKind.Snapshot:
                     if (!isHost && phase != RacePhase.Lobby) ApplySnapshot(PacketCodec.DecodeSnapshot(packet));
@@ -79,18 +79,22 @@ public partial class Main
             if (isHost) transport?.Disconnect(sender);
         }
     }
+    private void RejectPeer(int peer,string reason)
+    {SendControl(peer,new("error",Message:reason));ScheduleSession(.25,()=>transport?.Disconnect(peer),guardRound:false);}
     private void HandleControl(int sender, SessionMessage m)
     {
+        if(HandleCampaignControl(sender,m))return;
         if (isHost)
         {
             if (m.Kind == "ping" && players.ContainsKey(sender)) { SendControl(sender, new("pong", SentTime: m.SentTime)); return; }
             if (m.Kind == "hello")
             {
-                if (phase != RacePhase.Lobby || campaign?.CompletedRounds>0 || acceptedHello.ContainsKey(sender)) { transport?.Disconnect(sender); return; }
-                if (m.Protocol != 3 || m.ContentHash != contentHash || !new BuildValidator(catalog).IsValid(m.Loadout) || m.Color is < 0 or > 7 || m.Name is null || m.Name.Length > 20)
+                if (phase != RacePhase.Lobby || acceptedHello.ContainsKey(sender)) { transport?.Disconnect(sender); return; }
+                if (m.Protocol != 4 || m.ContentHash != contentHash || !new BuildValidator(catalog).IsValid(m.Loadout) || m.Color is < 0 or > 7 || m.Name is null || m.Name.Length > 20)
                 {
-                    SendControl(sender, new("error", Message: "Niezgodna wersja gry, dane lub build.")); transport?.Disconnect(sender); return;
+                    RejectPeer(sender,"Niezgodna wersja gry, dane lub build."); return;
                 }
+                if(gameMode==GameMode.Campaign){HandleCampaignHello(sender,m);return;}
                 // A joining human takes a bot's slot if the lobby is full.
                 if (players.Count >= 8)
                 {
@@ -105,8 +109,8 @@ public partial class Main
             }
             else if (phase == RacePhase.Lobby && players.TryGetValue(sender, out var player))
             {
-                if (m.Kind == "campaign_action")HandleCampaignAction(sender,m.Message,m.ItemId);
-                if (m.Kind == "ready") { players[sender] = player with { Ready = !player.Ready }; PublishLobby(); }
+                if (m.Kind == "campaign_action"){if(m.RequestId!=Guid.Empty)HandleCampaignAction(sender,m.Message,m.ItemId,m.RequestId);}
+                if (m.Kind == "ready" && (campaign is null || campaignIdentityReady.Contains(sender))) { players[sender] = player with { Ready = !player.Ready }; PublishLobby(); }
                 if (m.Kind == "loadout" && gameMode!=GameMode.Quick) HandleBuildRequest(sender,m);
             }
         }
@@ -115,7 +119,7 @@ public partial class Main
             if (m.Kind == "pong") { diagnostics.ObserveRtt(now - m.SentTime); return; }
             if (m.Kind == "build_error") { ui.Notice(m.Message,3); if(garage.IsOpen)garage.Notify(m.Message); return; }
             if(m.Kind=="reward" && m.Reward is not null){AcceptReward(m.Reward);return;}
-            if (m.Kind == "error") { Leave(m.Message); return; }
+            if (m.Kind == "error") { Leave(m.Message);if(arguments.ContainsKey("exit-on-disconnect"))GetTree().Quit(3);return; }
             if (m.Kind is "lobby" or "start" or "roster")
             {
                 UpdateCampaignMessage(m);
@@ -123,11 +127,11 @@ public partial class Main
                 if (m.BalanceRules is not null) { if (!m.BalanceRules.IsValid) throw new InvalidDataException("Balance rules."); balanceRules = m.BalanceRules; }
                 players.Clear(); foreach (var p in m.Players) players.Add(p.Id, p);
                 if (m.Kind == "start") { raceId = m.RaceId; InitializeRace(); }
-                else if (m.Kind == "lobby") { phase = RacePhase.Lobby; ui.ShowLobby(players.Values.ToArray(), false, localId); ui.ShowBalance(balanceRules,false); ProbeBuilds(); }
+                else if (m.Kind == "lobby") { phase = RacePhase.Lobby;SyncSessionState(); ui.ShowLobby(players.Values.ToArray(), false, localId); ui.ShowBalance(balanceRules,false); ProbeBuilds(); }
                 else foreach (var p in players.Values) if (racers.TryGetValue(p.Id, out var r)) r.Info = p;
                 RefreshGarage();
             }
-            if (m.Kind == "results" && m.RaceId == raceId && m.Ranking is not null) { UpdateCampaignMessage(m); finalRanking = m.Ranking; phase = RacePhase.Podium; ShowPodium(); }
+            if (m.Kind == "results" && m.RaceId == raceId && m.Ranking is not null) { UpdateCampaignMessage(m); finalRanking = m.Ranking; phase = RacePhase.Podium;SyncSessionState(); ShowPodium(); }
         }
     }
     private static string CleanName(string name)
@@ -165,7 +169,7 @@ public partial class Main
     {
         if (s.RaceId != raceId || s.Tick <= lastSnapshotTick) return;
         diagnostics.ObserveSnapshot(now);
-        lastSnapshotTick = s.Tick; receivedSnapshots++; phase = s.Phase; raceElapsed = s.Elapsed; raceRemaining = s.Remaining;
+        lastSnapshotTick = s.Tick; receivedSnapshots++; phase = s.Phase;SyncSessionState(); raceElapsed = s.Elapsed; raceRemaining = s.Remaining;
         foreach (var state in s.Vehicles)
         {
             if (!racers.TryGetValue(state.Id, out var r)) continue;

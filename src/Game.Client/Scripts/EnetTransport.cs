@@ -6,6 +6,7 @@ namespace Game.Client;
 public sealed class EnetTransport : INetworkTransport
 {
     private ENetMultiplayerPeer? peer;
+    private readonly HashSet<int> connections=[];
     private readonly Queue<(bool Connected, int Id)> notifications = [];
     public bool IsHost { get; private set; }
     public int LocalId => peer?.GetUniqueId() ?? 1;
@@ -16,8 +17,8 @@ public sealed class EnetTransport : INetworkTransport
     {
         Dispose(); peer = new ENetMultiplayerPeer();
         // Never dispose a peer from inside one of its native Poll callbacks.
-        peer.PeerConnected += id => notifications.Enqueue((true, (int)id));
-        peer.PeerDisconnected += id => notifications.Enqueue((false, (int)id));
+        peer.PeerConnected += id => {connections.Add((int)id);notifications.Enqueue((true,(int)id));};
+        peer.PeerDisconnected += id => {connections.Remove((int)id);notifications.Enqueue((false,(int)id));};
     }
     public void Host(int port, int maxPlayers)
     {
@@ -55,10 +56,10 @@ public sealed class EnetTransport : INetworkTransport
         peer.TransferMode = reliable ? MultiplayerPeer.TransferModeEnum.Reliable : MultiplayerPeer.TransferModeEnum.UnreliableOrdered;
         peer.PutPacket(packet);
     }
-    public void Disconnect(int id) => peer?.DisconnectPeer(id);
+    public void Disconnect(int id) {if(peer is not null&&connections.Remove(id))peer.DisconnectPeer(id);}
     public void Dispose()
     {
         if (peer is null) return;
-        var old = peer; peer = null; old.Close(); old.Dispose(); notifications.Clear();
+        var old = peer; peer = null; old.Close(); old.Dispose(); notifications.Clear();connections.Clear();
     }
 }

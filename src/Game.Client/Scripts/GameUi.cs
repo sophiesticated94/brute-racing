@@ -7,6 +7,12 @@ public partial class GameUi : CanvasLayer
 {
     public event Action? SoloRequested, HostRequested, JoinRequested, ReadyRequested, StartRequested, LeaveRequested, ReplayRequested;
     public event Action? LoadoutChanged;
+    public event Action<Guid>? ResumeRequested;
+    private OptionButton campaignSaves=null!;
+    private Guid[] savedCampaignIds=[];
+    public void SetCampaignSaves((Guid Id,string Label)[] saves)
+    {savedCampaignIds=saves.Select(s=>s.Id).ToArray();campaignSaves.Clear();foreach(var save in saves)campaignSaves.AddItem(save.Label);}
+
     public LineEdit Address { get; private set; } = null!;
     public SpinBox Port { get; private set; } = null!;
     public LineEdit PlayerName { get; private set; } = null!;
@@ -66,6 +72,8 @@ public partial class GameUi : CanvasLayer
         Bots = new SpinBox { MinValue = 0, MaxValue = 7, Value = 3, Prefix = "Boty: " }; m.AddChild(Bots);
         CampaignLength=new SpinBox{MinValue=3,MaxValue=10,Value=6,Prefix="Wyścigi kampanii: "};m.AddChild(CampaignLength);
         AddButton(m, "KAMPANIA SOLO", () => SoloRequested?.Invoke(), true);
+        campaignSaves=new OptionButton();m.AddChild(campaignSaves);
+        AddButton(m,"WZNÓW ZAPISANĄ KAMPANIĘ",()=>{if(campaignSaves.Selected>=0&&campaignSaves.Selected<savedCampaignIds.Length)ResumeRequested?.Invoke(savedCampaignIds[campaignSaves.Selected]);});
         Preset=new OptionButton();for(int i=0;i<3;i++)Preset.AddItem($"ARCHIWUM {i+1}");m.AddChild(Preset);Preset.ItemSelected+=i=>PresetSelected?.Invoke((int)i);
         AddButton(m,"GARAŻ / ARCHIWUM / KOSMETYKA",()=>GarageRequested?.Invoke());
         DirectoryUrl=new LineEdit{Text="",PlaceholderText="Adres katalogu HTTPS (lub http://localhost:5080)",MaxLength=256};m.AddChild(DirectoryUrl);

@@ -6,10 +6,10 @@ namespace Game.Core;
 
 public sealed record ArchivedBuild(string Name,PlayerLoadoutDto Loadout,Guid CampaignId,DateTimeOffset EarnedAt);
 public enum RewardKind { Race, Campaign }
-public sealed record RewardReceipt(Guid Id,RewardKind Kind,int Coins=0,ArchivedBuild? Archive=null);
+public sealed record RewardReceipt(Guid Id,RewardKind Kind,int Coins=0,ArchivedBuild? Archive=null,Guid CampaignId=default);
 public sealed class PlayerProfile
 {
-    public int SchemaVersion {get;set;}=1;
+    public int SchemaVersion {get;set;}=2;
     public Guid PlayerId {get;set;}=Guid.NewGuid();
     public string Name {get;set;}="Kierowca";
     public int Paint {get;set;}
@@ -22,14 +22,16 @@ public sealed class PlayerProfile
     public HashSet<Guid> AppliedRewards {get;set;}=[];
     public int CompletedRaces {get;set;}
     public int CompletedCampaigns {get;set;}
+    public Dictionary<Guid,CampaignCredential> CampaignCredentials {get;set;}=[];
 }
 
 public static class ProfileRules
 {
     public static void Validate(GameCatalog catalog,PlayerProfile profile)
     {
-        if(profile.SchemaVersion!=1 || profile.PlayerId==Guid.Empty || profile.Name is null || profile.Name.Length>20 || profile.Paint is <0 or >7 || profile.Coins is <0 or >1000000 ||
+        if(profile.SchemaVersion!=2 || profile.PlayerId==Guid.Empty || profile.Name is null || profile.Name.Length>20 || profile.Paint is <0 or >7 || profile.Coins is <0 or >1000000 ||
             profile.SelectedPreset is <0 or >2 || profile.Presets is not {Length:3} || profile.OwnedCosmetics is null || profile.AppliedRewards is null ||
+            profile.CampaignCredentials is null || profile.CampaignCredentials.Count>1000 || profile.CampaignCredentials.Any(p=>p.Key==Guid.Empty||p.Value is null||p.Value.ParticipantId==Guid.Empty||!CampaignAuthentication.IsSecret(p.Value.Secret)) ||
             profile.CompletedCampaigns<0 || profile.CompletedRaces<0 || !profile.OwnedCosmetics.Contains(profile.SelectedCosmetic) || profile.OwnedCosmetics.Any(id=>!catalog.Cosmetics.ContainsKey(id)))
             throw new InvalidDataException("Nieprawidłowy profil.");
         var validator=new BuildValidator(catalog);
@@ -61,21 +63,51 @@ public static class ProfileRules
 }
 
 public sealed record ProfileEnvelope(int SchemaVersion,PlayerProfile Profile,string Checksum);
+internal sealed class LegacyPlayerProfile
+{
+    public int SchemaVersion {get;set;}=1;
+    public Guid PlayerId {get;set;}=Guid.NewGuid();
+    public string Name {get;set;}="Kierowca";
+    public int Paint {get;set;}
+    public int Coins {get;set;}
+    public int SelectedPreset {get;set;}
+    public string SelectedCosmetic {get;set;}="stock";
+    public HashSet<string> OwnedCosmetics {get;set;}=new(StringComparer.Ordinal){"stock"};
+    public ArchivedBuild[] Presets {get;set;}=new[]{"machine_gun","laser","rocket"}.Select((weapon,i)=>new ArchivedBuild($"Rook {i+1}",PlayerLoadoutDto.Default with {WeaponId=weapon},Guid.Empty,DateTimeOffset.UnixEpoch)).ToArray();
+    public ArchivedBuild? PendingArchive {get;set;}
+    public HashSet<Guid> AppliedRewards {get;set;}=[];
+    public int CompletedRaces {get;set;}
+    public int CompletedCampaigns {get;set;}
+}
+
 public static class ProfileCodec
 {
     public static string Encode(GameCatalog catalog,PlayerProfile profile)
     {
         ProfileRules.Validate(catalog,profile);
-        return JsonSerializer.Serialize(new ProfileEnvelope(1,profile,Checksum(profile)),GameCatalog.Json);
+        return JsonSerializer.Serialize(new ProfileEnvelope(2,profile,Checksum(profile)),GameCatalog.Json);
     }
     public static PlayerProfile Decode(GameCatalog catalog,string json)
     {
-        var envelope=JsonSerializer.Deserialize<ProfileEnvelope>(json,GameCatalog.Json)??throw new InvalidDataException("Pusty profil.");
-        if(envelope.SchemaVersion!=1) throw new NotSupportedException("Nowszy format profilu. Plik pozostawiono bez zmian.");
-        if(envelope.Profile is null || envelope.Checksum!=Checksum(envelope.Profile)) throw new InvalidDataException("Nieprawidłowa suma kontrolna profilu.");
-        ProfileRules.Validate(catalog,envelope.Profile);return envelope.Profile;
+        using var doc=JsonDocument.Parse(json);var root=doc.RootElement;
+        if(root.ValueKind!=JsonValueKind.Object||!root.TryGetProperty("schemaVersion",out var version)||!version.TryGetInt32(out int schema)||!root.TryGetProperty("profile",out _)||!root.TryGetProperty("checksum",out _))throw new InvalidDataException("Nieprawidłowa struktura profilu.");
+        if(schema is not (1 or 2))throw new NotSupportedException("Nowszy format profilu. Plik pozostawiono bez zmian.");
+        string profileJson=root.GetProperty("profile").GetRawText();string expected=root.GetProperty("checksum").GetString()??"";
+        PlayerProfile profile;
+        if(schema==1)
+        {
+            var legacy=JsonSerializer.Deserialize<LegacyPlayerProfile>(profileJson,GameCatalog.Json)??throw new InvalidDataException("Pusty profil.");
+            if(legacy.SchemaVersion!=1||expected!=Checksum(legacy))throw new InvalidDataException("Nieprawidłowa suma kontrolna starego profilu.");
+            profile=JsonSerializer.Deserialize<PlayerProfile>(JsonSerializer.Serialize(legacy,GameCatalog.Json),GameCatalog.Json)!;profile.SchemaVersion=2;
+        }
+        else
+        {
+            profile=JsonSerializer.Deserialize<PlayerProfile>(profileJson,GameCatalog.Json)??throw new InvalidDataException("Pusty profil.");
+            if(expected!=Checksum(profile))throw new InvalidDataException("Nieprawidłowa suma kontrolna profilu.");
+        }
+        ProfileRules.Validate(catalog,profile);return profile;
     }
-    private static string Checksum(PlayerProfile profile)=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(profile,GameCatalog.Json))));
+    private static string Checksum<T>(T profile)=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(profile,GameCatalog.Json))));
 }
 
 public sealed class ProfileRepository(GameCatalog catalog,string path)
@@ -102,15 +134,7 @@ public sealed class ProfileRepository(GameCatalog catalog,string path)
     }
     public void Save(PlayerProfile profile)
     {
-        if(ReadOnly) return;
-        string content=ProfileCodec.Encode(catalog,profile); Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
-        string temp=path+".tmp-"+Guid.NewGuid().ToString("N");
-        try
-        {
-            using(var stream=new FileStream(temp,FileMode.CreateNew,FileAccess.Write,FileShare.None))
-            {var bytes=Encoding.UTF8.GetBytes(content);stream.Write(bytes);stream.Flush(true);}
-            if(File.Exists(path))File.Replace(temp,path,path+".bak",true);else File.Move(temp,path);
-        }
-        finally{if(File.Exists(temp))File.Delete(temp);}
+        if(ReadOnly) throw new InvalidDataException("Profil nowszej wersji jest tylko do odczytu.");
+        AtomicJsonFile.Write(path,ProfileCodec.Encode(catalog,profile));
     }
 }

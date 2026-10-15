@@ -35,7 +35,7 @@ public class ProfileTests
     {
         var catalog=DomainTests.Catalog();var profile=new PlayerProfile();var json=ProfileCodec.Encode(catalog,profile);
         Assert.Throws<InvalidDataException>(()=>ProfileCodec.Decode(catalog,json.Replace("\"coins\":0","\"coins\":999")));
-        Assert.Throws<NotSupportedException>(()=>ProfileCodec.Decode(catalog,json.Replace("\"schemaVersion\":1","\"schemaVersion\":99")));
+        Assert.Throws<NotSupportedException>(()=>ProfileCodec.Decode(catalog,json.Replace("\"schemaVersion\":2","\"schemaVersion\":99")));
         Assert.Equal(3,profile.Presets.Length);
     }
 }

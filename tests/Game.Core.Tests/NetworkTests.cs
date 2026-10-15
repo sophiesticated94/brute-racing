@@ -10,6 +10,12 @@ public class NetworkTests
         1.4f, 80, 45, 20, 12, 5, 1, 3, 15, 0, 1, 101, -1);
 
     [Fact]
+    public void InputBatchKeepsRaceEpochAndSafeDiagnosticText()
+    {
+        var batch=PacketCodec.DecodeInputBatch(PacketCodec.EncodeInputs([Command()],88));
+        Assert.Equal(88u,batch.RaceId);Assert.Single(batch.Commands);Assert.StartsWith("Input 1/1:",batch.Commands[0].ToString());
+    }
+    [Fact]
     public void RedundantInputsRoundTripExactly()
     {
         var inputs = new[] { Command(1), Command(2), Command(3) };

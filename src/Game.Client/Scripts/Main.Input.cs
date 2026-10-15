@@ -12,7 +12,7 @@ public partial class Main
         float throttle = (KeyDown(Key.W, Key.Up) ? 1 : 0) - (KeyDown(Key.S, Key.Down) ? 1 : 0);
         float brake = 0;
         bool fire = Input.IsMouseButtonPressed(MouseButton.Left), mine = Input.IsMouseButtonPressed(MouseButton.Right), handbrake = Input.IsPhysicalKeyPressed(Key.Space);
-        var pads = Input.GetConnectedJoypads();
+        var pads = LocalPads();
         if (pads.Count > 0)
         {
             int pad = pads[0]; float stick = Input.GetJoyAxis(pad, JoyAxis.LeftX);
