@@ -19,10 +19,13 @@ public partial class GarageScreen : CanvasLayer
     private Action? pendingConfirm;
     private string selected="drive_accel";
     private bool refreshing;
+    public void ObserveInputBlocks(Action blocked)
+    {root.VisibilityChanged+=()=>{if(root.Visible)blocked();};confirmation.VisibilityChanged+=()=>{if(confirmation.Visible)blocked();};}
+    public bool IsBlockingInput=>IsOpen||confirmation?.Visible==true;
     public bool IsOpen=>root?.Visible==true;
     public void Configure(GameCatalog value){catalog=value;graph.Configure(value.Skills);}
     public void Open(GarageContext value){root.Visible=true;Refresh(value);}
-    public void Close()=>root.Visible=false;
+    public void Close(){root.Visible=false;confirmation.Hide();pendingConfirm=null;}
     public void Notify(string text)=>notice.Text=text;
     public override void _Ready()
     {

@@ -71,8 +71,8 @@ public partial class Main
         if (count == 2)
         {
             uint epoch = raceId;
-            GetTree().CreateTimer(.1, false, true).Timeout += () =>
-            { if (raceId == epoch && inSession && GodotObject.IsInstanceValid(r.Car) && r.Car.Health > 0) Shoot(r, def); };
+            ScheduleSession(.1,() =>
+            { if (raceId == epoch && inSession && GodotObject.IsInstanceValid(r.Car) && r.Car.Health > 0) Shoot(r, def); },true);
         }
     }
     private void Shoot(Racer r, WeaponDefinition def)

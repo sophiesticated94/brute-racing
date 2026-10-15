@@ -25,6 +25,7 @@ public partial class Main
         ui.PlayerName.Text=profile.Name;ui.Paint.Select(profile.Paint);ui.UpdatePresets(profile);
         ui.DirectoryUrl.Text=System.Environment.GetEnvironmentVariable("MCM_DIRECTORY_URL")??"";
         garage=new GarageScreen();AddChild(garage);garage.Configure(catalog);garage.Command+=GarageCommand;
+        ui.ObserveInputBlocks(gameplayInput.Block);garage.ObserveInputBlocks(gameplayInput.Block);GetWindow().FocusExited+=gameplayInput.Block;
         ui.QuickRequested+=StartQuick;ui.CancelQueueRequested+=()=>{CancelQuick();LeaveInternal();ui.ShowMenu();ui.Notice("Anulowano szukanie rywali.");};
         ui.GarageRequested+=OpenGarage;ui.PresetSelected+=slot=>SelectPreset(slot);
         if(gameMode==GameMode.Campaign)SetBalance(LobbyBalanceMode.OpenMayhem);
@@ -170,7 +171,7 @@ public partial class Main
         }
         if(campaign is not null && !campaign.Complete && !smoke)
         {
-            uint epoch=raceId;GetTree().CreateTimer(3).Timeout+=()=>{if(epoch==raceId && phase==RacePhase.Podium)BeginIntermission();};
+            uint epoch=raceId;ScheduleSession(3,()=>{if(epoch==raceId && phase==RacePhase.Podium)BeginIntermission();});
         }
     }
     private void DeliverReward(int target,RewardReceipt receipt)

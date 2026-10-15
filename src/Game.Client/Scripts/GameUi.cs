@@ -131,7 +131,9 @@ public partial class GameUi : CanvasLayer
         notice = new Label { AnchorLeft = .5f, AnchorRight = .5f, OffsetLeft = -450, OffsetRight = 450, OffsetTop = 72, OffsetBottom = 110, HorizontalAlignment = HorizontalAlignment.Center };
         Font(notice, 18, Accent); root.AddChild(notice);
     }
-    public bool BlockingInput => pause.Visible;
+    public void ObserveInputBlocks(Action blocked)
+    {foreach(var panel in new[]{menu,lobby,podium,pause})panel.VisibilityChanged+=()=>{if(panel.Visible)blocked();};}
+    public bool BlockingInput => menu.Visible||lobby.Visible||podium.Visible||pause.Visible;
     public void ConfigureMap(Vector3[] path) => map.SetTrack(path);
     public void UpdateMap((Vector3 Position, Color Color, bool Local)[] values) => map.UpdateCars(values);
     public void TogglePause() { if (hud.Visible) pause.Visible = !pause.Visible; }

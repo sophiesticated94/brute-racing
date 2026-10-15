@@ -8,9 +8,10 @@ public partial class Main
 {
     private EnetTransport CreateTransport()
     {
-        var net = new EnetTransport();
+        var net = new EnetTransport();long generation=lifecycle.Generation;
         net.Connected += id =>
         {
+            if(!lifecycle.IsCurrent(generation)||shuttingDown)return;
             if (!isHost && id == 1)
             {
                 localId = net.LocalId;
@@ -20,15 +21,22 @@ public partial class Main
         };
         net.Disconnected += id =>
         {
+            if(!lifecycle.IsCurrent(generation)||shuttingDown)return;
             if (!isHost && id == 1)
             {
                 if(queueTicket is not null&&phase==RacePhase.Lobby){RetryQuick();return;}
-                Leave("Gospodarz zakończył połączenie.");
-                if (arguments.ContainsKey("exit-on-disconnect")) GetTree().Quit();
+                bool finishedSmoke=smoke&&resultsWritten;Leave("Gospodarz zakończył połączenie.");
+                if (finishedSmoke||arguments.ContainsKey("exit-on-disconnect")) GetTree().Quit();
                 return;
             }
+            HandlePeerLost(id);
+        };
+        net.Received += (sender,bytes)=>{if(lifecycle.IsCurrent(generation)&&!shuttingDown)Receive(sender,bytes);}; return net;
+    }
+    private void HandlePeerLost(int id)
+    {
             acceptedHello.Remove(id);quickPeers.Remove(id);
-            if (isHost && players.TryGetValue(id, out var p))
+            if (isHost && players.TryGetValue(id, out var p) && !p.Bot)
             {
                 if (phase == RacePhase.Lobby && campaign?.CompletedRounds is not >0) players.Remove(id);
                 else
@@ -40,8 +48,6 @@ public partial class Main
                 }
                 if (phase == RacePhase.Lobby) PublishLobby();
             }
-        };
-        net.Received += Receive; return net;
     }
     private void Receive(int sender, byte[] packet)
     {
@@ -49,6 +55,7 @@ public partial class Main
         {
             if (!isHost && sender != 1) return;
             if (!isHost) lastServerPacket = now;
+            else if(acceptedHello.ContainsKey(sender))acceptedHello[sender]=now;
             switch ((PacketKind)packet[0])
             {
                 case PacketKind.Control: HandleControl(sender, PacketCodec.DecodeJson<SessionMessage>(packet, PacketKind.Control)); break;
@@ -199,7 +206,7 @@ public partial class Main
     }
     private async void MapPort(int port)
     {
-        string status;
+        long generation=lifecycle.Generation;string status;
         try
         {
             status = await Task.Run(() =>
@@ -211,6 +218,6 @@ public partial class Main
             });
         }
         catch { status = "UPnP niedostępne. Połączenia LAN nadal działają."; }
-        if (IsInsideTree() && inSession && isHost) { ui.ConnectionStatus(status);ui.Notice(status, 10); }
+        if (!shuttingDown&&lifecycle.IsCurrent(generation)&&IsInsideTree() && inSession && isHost) { ui.ConnectionStatus(status);ui.Notice(status, 10); }
     }
 }

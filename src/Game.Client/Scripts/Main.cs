@@ -234,7 +234,7 @@ public partial class Main : Node3D
     }
     private void InitializeRace()
     {
-        ClearRace(); phase = RacePhase.Countdown; clock = new(); clock.Start();
+        ClearRace(); phase = RacePhase.Countdown;SyncSessionState(); clock = new(); clock.Start();
         localSequence = 0; lastSnapshotTick = 0; tick = 0; resultsWritten = false; receivedSnapshots = 0;
         recentInputs.Clear(); pending.Clear(); seenEvents.Clear(); eventCounts.Clear(); finalRanking = []; roundRecorded = false;
         shots = destructions = checkpointPasses = 0;
@@ -272,7 +272,8 @@ public partial class Main : Node3D
     private void PhysicsTick(double delta)
     {
         if (catalog is null) return;
-        now += delta; transport?.Poll(); FlushDelayed();UpdateQuick();
+        now += delta; transport?.Poll(); FlushDelayed();UpdateQuick();SyncSessionState();
+        if(isHost)foreach(var peer in acceptedHello.Where(p=>now-p.Value>10).Select(p=>p.Key).ToArray()){transport?.Disconnect(peer);HandlePeerLost(peer);}
         if (inSession && !isHost && transport is not null && now >= nextPing)
         { nextPing = now + 1; SendControl(1, new("ping", SentTime: now)); }
         if (smoke && now > maxSeconds && !resultsWritten)
@@ -289,8 +290,7 @@ public partial class Main : Node3D
         tick++;
         if (racers.TryGetValue(localId, out var local))
         {
-            var command = autoPlay ? BotInput(local, ++localSequence) : ReadInput(local, ++localSequence);
-            if (ui.BlockingInput || garage.IsOpen) command = command.Neutral;
+            var command = LocalCommand(local,++localSequence);
             if (isHost) local.Gate.Accept(command, now);
             else
             {
@@ -325,7 +325,7 @@ public partial class Main : Node3D
             UpdateOrdnance((float)delta);
             clock.Update(delta, racers.Count > 0 && racers.Values.All(r => r.Progress.Finished));
             raceElapsed = clock.Elapsed; raceRemaining = (float)clock.Remaining;
-            var previous = phase; phase = clock.Phase;
+            var previous = phase; phase = clock.Phase;SyncSessionState();
             if (previous != RacePhase.Podium && phase == RacePhase.Podium) FinishRace();
             if (tick % 2 == 0 && transport is not null) Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), false, 2);
         }
@@ -336,13 +336,13 @@ public partial class Main : Node3D
             roundReports.Add(new { raceId, ranking = finalRanking, events = new Dictionary<string, int>(eventCounts) });
             if (completedRaces < requiredRounds)
             {
-                if (isHost) GetTree().CreateTimer(1).Timeout += () => { if(gameMode==GameMode.Campaign)BeginIntermission();else StartRace(); };
+                if (isHost) ScheduleSession(1,() => { if(gameMode==GameMode.Campaign)BeginIntermission();else StartRace(); });
             }
             else
             {
                 WriteResults(true);
                 // Allow reliable results and final snapshot to leave the host before closing ENet.
-                GetTree().CreateTimer(1).Timeout += () => GetTree().Quit();
+                ScheduleSession(1,() => GetTree().Quit());
             }
         }
     }
@@ -363,7 +363,7 @@ public partial class Main : Node3D
         finalRanking = Ranking(); AwardRace(); Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), false, 2);
         // Final state is reliable, so the podium does not depend on the last unreliable snapshot.
         Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), true, 0);
-        SendControl(0, new("results", Ranking: finalRanking, RaceId: raceId)); ShowPodium();
+        SendControl(0, new("results", Ranking: finalRanking, RaceId: raceId));  ShowPodium();
         GD.Print("RACE_FINISH ranking=" + string.Join(',', finalRanking));
     }
     private void ClearRace()
@@ -374,7 +374,10 @@ public partial class Main : Node3D
     }
     private void LeaveInternal()
     {
+        lifecycle.Reset();gameplayInput.Reset();
         transport?.Dispose(); transport = null; inSession = false; phase = RacePhase.Lobby;
+        players.Clear(); seenEvents.Clear();eventCounts.Clear();aimLine=null;nextAimLine=0;
+        lastSnapshotTick=0;localSequence=0;nextPing=0;
         players.Clear(); acceptedHello.Clear(); sentBuildProbes = false; campaign=null;campaignView=null;garage?.Close(); delayed.Clear(); finalRanking = []; if (raceRoot is not null) ClearRace();
     }
     private void Leave(string message) { CancelQuick();SaveProfile(); LeaveInternal(); ui.ShowMenu(); ui.Notice(message, 7); GD.Print(message); }
@@ -384,7 +387,7 @@ public partial class Main : Node3D
         var snapshot = CreateSnapshot();
         var report = new
         {
-            success, host = isHost, localId, tick, mode=gameMode.ToString(), campaign=campaign?.View()??campaignView, coins=profile.Coins, profileRaces=profile.CompletedRaces, profileCampaigns=profile.CompletedCampaigns, phase = phase.ToString(), elapsed = raceElapsed,
+            success,sessionState=lifecycle.State.ToString(),sessionGeneration=lifecycle.Generation, host = isHost, localId, tick, mode=gameMode.ToString(), campaign=campaign?.View()??campaignView, coins=profile.Coins, profileRaces=profile.CompletedRaces, profileCampaigns=profile.CompletedCampaigns, phase = phase.ToString(), elapsed = raceElapsed,
             runtimeMetrics=runtimeMetrics.Report(),ranking = Ranking(), receivedSnapshots, shots, destructions, checkpointPasses, rejectedBuilds,
             simulatedFps = frameTotal > 0 ? frameCount / frameTotal : 0,
             averageFps = wallFrameTotal > 0 ? (frameCount - 1) / wallFrameTotal : 0, worstFrameMs = wallWorstFrame * 1000,
@@ -400,5 +403,5 @@ public partial class Main : Node3D
         if (resultPath.Length > 0) { Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(resultPath))!); System.IO.File.WriteAllText(resultPath, json); }
         GD.Print("SMOKE_RESULT " + JsonSerializer.Serialize(report));
     }
-    public override void _ExitTree() { CancelQuick();if(ui is not null)SaveProfile(); transport?.Dispose(); }
+    public override void _ExitTree() { shuttingDown=true;lifecycle.Reset();CancelQuick();if(ui is not null)SaveProfile(); transport?.Dispose(); }
 }
