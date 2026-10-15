@@ -11,6 +11,7 @@ public partial class ArcadeCar : RigidBody3D
     public bool Simulating = true;
     public bool Driving;
     public float SurfaceGrip = 1;
+    public float MovementScale = 1;
     public float TurretYaw;
     public float Health = 120;
     public float Invulnerability;
@@ -122,8 +123,8 @@ public partial class ArcadeCar : RigidBody3D
             if (Grounded)
             {
                 float throttle = Command.Throttle;
-                float limit = throttle >= 0 ? Stats.MaxSpeed : Stats.ReverseSpeed;
-                float motor = (Mathf.Abs(speed) < limit || Mathf.Sign(throttle) != Mathf.Sign(speed)) ? throttle * Stats.Acceleration : 0;
+                float limit = (throttle >= 0 ? Stats.MaxSpeed : Stats.ReverseSpeed) * MovementScale;
+                float motor = (Mathf.Abs(speed) < limit || Mathf.Sign(throttle) != Mathf.Sign(speed)) ? throttle * Stats.Acceleration * MovementScale : 0;
                 state.ApplyCentralForce(forward * motor * Stats.Mass);
                 if (Command.Brake > 0 || (throttle < 0 && speed > 1))
                     state.ApplyCentralForce(-forward * Mathf.Sign(speed) * Mathf.Min(Mathf.Abs(speed) / dt, Stats.Braking) * Stats.Mass * Mathf.Max(Command.Brake, -throttle));

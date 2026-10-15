@@ -44,7 +44,13 @@ public partial class Main
                 Art.Box(node, new(.2f, .2f, .25f), new(0, 0, .5f), new("ffbe45"), true);
                 node.LookAt(p + end.Normalized()); audio.PlayAt("rocket", p);
             }
-            ordnance.Add(new(e.Target, e.Actor, mine, end, node));
+            ordnance.Add(new(e.Target, e.Actor, mine, end, node) { Stats = e.Weapon ?? catalog.Weapons[mine ? "mine" : "rocket"] });
+        }
+        else if (e.Kind == "emp")
+        {
+            empFields.Add(new(p, e.Value, e.Weapon?.SlowDuration ?? 3, e.Weapon?.SlowFactor ?? .7f));
+            var field = Art.Cylinder(effects, e.Value, e.Value, .04f, p + Vector3.Up * .05f, new("4b7394"), 24);
+            var t = field.CreateTween(); t.TweenInterval(e.Weapon?.SlowDuration ?? 3); t.TweenCallback(Callable.From(field.QueueFree));
         }
         else if (e.Kind is "explosion" or "expire")
         {

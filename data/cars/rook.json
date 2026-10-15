@@ -1,7 +1,19 @@
 {
-  "id": "rook", "name": "Rook", "maxSpeed": 27, "acceleration": 22,
-  "braking": 30, "reverseSpeed": 10, "grip": 8.5, "driftFactor": 0.24,
-  "turnSpeed": 2.5, "mass": 700, "maxHealth": 120, "armor": 0.1,
-  "knockbackResistance": 0.15, "spring": 24000, "damping": 3200,
-  "suspensionLength": 0.85
+  "id": "rook",
+  "name": "Rook",
+  "maxSpeed": 27,
+  "acceleration": 22,
+  "braking": 30,
+  "reverseSpeed": 10,
+  "grip": 8.5,
+  "driftFactor": 0.24,
+  "turnSpeed": 2.5,
+  "mass": 700,
+  "maxHealth": 120,
+  "armor": 0.1,
+  "knockbackResistance": 0.15,
+  "spring": 24000,
+  "damping": 3200,
+  "suspensionLength": 0.85,
+  "turretTraverseSpeed": 4.5
 }

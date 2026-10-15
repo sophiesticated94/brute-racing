@@ -14,6 +14,7 @@ try {
         $info = [System.Diagnostics.ProcessStartInfo]::new()
         $info.FileName = (Get-Command pwsh).Source; $info.UseShellExecute = $false; $info.CreateNoWindow = $true
         $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+    $info.StandardOutputEncoding = [System.Text.Encoding]::UTF8; $info.StandardErrorEncoding = [System.Text.Encoding]::UTF8
         foreach ($argument in (@('-NoProfile','-File',(Join-Path $PSScriptRoot $check.File)) + $check.Args)) { $info.ArgumentList.Add($argument) }
         $process = [System.Diagnostics.Process]::Start($info)
         $running += [pscustomobject]@{Name=$check.Name; Process=$process; Output=$process.StandardOutput.ReadToEndAsync(); Error=$process.StandardError.ReadToEndAsync()}

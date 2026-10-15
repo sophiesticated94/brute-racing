@@ -20,7 +20,7 @@ public class DomainTests
     [InlineData("rook", "unknown", 1)]
     [InlineData("rook", "mine", 1)]
     [InlineData("rook", "rocket", 0)]
-    [InlineData("rook", "laser", 5)]
+    [InlineData("rook", "laser", 6)]
     public void ValidatorRejectsUnavailableEquipment(string car, string weapon, int rank)
     {
         var loadout = new PlayerLoadoutDto(car, weapon, rank, new());

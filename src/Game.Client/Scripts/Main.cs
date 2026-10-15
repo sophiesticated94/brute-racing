@@ -12,6 +12,8 @@ public partial class Main : Node3D
         public ArcadeCar Car = car;
         public RaceProgress Progress = progress;
         public InputGate Gate = new();
+        public ComputedLoadoutStats Build = null!;
+        public float SlowRemaining, SlowFactor = 1;
         public float Energy = 100, Heat, PrimaryCooldown, MineCooldown, Respawn, Invulnerable = 2;
         public int Ammo, Mines;
         public bool Overheated;
@@ -28,7 +30,11 @@ public partial class Main : Node3D
         public Node3D Node = node;
         public float Age;
         public int SmokeFrame;
+        public WeaponDefinition Stats = null!;
     }
+    private sealed class EmpField(Vector3 position, float radius, float duration, float factor)
+    { public Vector3 Position = position; public float Radius = radius, Remaining = duration, Factor = factor; }
+    private readonly List<EmpField> empFields = [];
     private GameCatalog catalog = null!;
     private string contentHash = "";
     private RaceTrack track = null!;
@@ -107,7 +113,7 @@ public partial class Main : Node3D
         try
         {
             var docs = new Dictionary<string, string>();
-            foreach (var file in new[] { "cars/rook.json", "weapons/weapons.json", "tracks/cinder.json" })
+            foreach (var file in GameCatalog.Files)
                 docs[file] = Godot.FileAccess.GetFileAsString("res://data/" + file);
             catalog = GameCatalog.Load(file => docs[file]);
             contentHash = PacketCodec.ContentHash(docs.OrderBy(p => p.Key).Select(p => p.Value));
@@ -128,7 +134,7 @@ public partial class Main : Node3D
         catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
 
-    private PlayerLoadoutDto SelectedLoadout() => new("rook", ui.WeaponId, 1, new());
+    private PlayerLoadoutDto SelectedLoadout() => new("rook", ui.WeaponId, arguments.TryGetValue("weapon-level", out var level) ? Math.Clamp(int.Parse(level), 1, 5) : 1, new(), arguments.TryGetValue("mine-level", out var mine) ? Math.Clamp(int.Parse(mine), 1, 5) : 1);
     private string SelectedName() => string.IsNullOrWhiteSpace(ui.PlayerName.Text) ? "Kierowca" : ui.PlayerName.Text.Trim();
     private void StartSolo()
     {
@@ -217,6 +223,7 @@ public partial class Main : Node3D
             if (!isHost) { car.CollisionLayer = p.Id == localId ? 2u : 0u; car.CollisionMask = p.Id == localId ? 1u : 0u; }
             car.ResetAt(track.Spawn(slot++), track.YawAt(0)); car.TurretYaw = desiredAim = track.YawAt(0);
             var racer = new Racer(p, car, new(catalog.Track.Checkpoints, catalog.Track.Laps));
+            racer.Build = VehicleStatsCalculator.CalculateBuild(catalog, p.Loadout);
             Refill(racer); racers.Add(p.Id, racer);
         }
         ui.ShowRace(); ui.Notice("Miedziany Kanion  /  rozgrzej opony", 2.5);
@@ -262,13 +269,20 @@ public partial class Main : Node3D
                 if (phase == RacePhase.Racing && local.Car.Health > 0)
                 {
                     float a = Mathf.Atan2(local.Car.GlobalPosition.X / catalog.Track.RadiusX, local.Car.GlobalPosition.Z / catalog.Track.RadiusZ);
-                    pending.Add(new(command, local.Car.Grounded, track.SurfaceGrip(local.Car.GlobalPosition), track.Height(a)));
+                    pending.Add(new(command, local.Car.Grounded, track.SurfaceGrip(local.Car.GlobalPosition), track.Height(a), local.Car.MovementScale));
                     if (pending.Count > 180) pending.RemoveAt(0);
                 }
                 local.Car.Driving = phase == RacePhase.Racing && local.Car.Health > 0;
                 local.Car.SurfaceGrip = track.SurfaceGrip(local.Car.GlobalPosition);
                 local.Car.TurretYaw = Mathf.RotateToward(local.Car.TurretYaw, command.AimYaw, (float)delta * local.Car.Stats.TurretTraverseSpeed);
             }
+        }
+        foreach (var field in empFields.ToArray())
+        {
+            field.Remaining -= (float)delta;
+            if (field.Remaining <= 0) { empFields.Remove(field); continue; }
+            if (isHost) foreach (var victim in racers.Values)
+                if (victim.Car.GlobalPosition.DistanceTo(field.Position) <= field.Radius) { victim.SlowRemaining = .2f; victim.SlowFactor = field.Factor; }
         }
         if (isHost)
         {
@@ -325,7 +339,7 @@ public partial class Main : Node3D
     {
         foreach (var child in raceRoot.GetChildren()) { raceRoot.RemoveChild(child); child.QueueFree(); }
         foreach (var child in effects.GetChildren()) { effects.RemoveChild(child); child.QueueFree(); }
-        racers.Clear(); ordnance.Clear(); pending.Clear(); recentInputs.Clear();
+        racers.Clear(); ordnance.Clear(); empFields.Clear(); pending.Clear(); recentInputs.Clear();
     }
     private void LeaveInternal()
     {

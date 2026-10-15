@@ -37,3 +37,6 @@ argumenty. Po każdym etapie zapisujemy wynik pełnego zestawu kontroli.
 
 ## Etap P0 — wynik
 Build bez błędów; 24 testy xUnit; impaired/combat PASS; przejęcie AI i utrata hosta PASS; smoke 8 aut PASS. Render sprawdzony lokalnie. Raporty: artifacts/p0-*.
+
+## Etap uzbrojenia — wynik
+27 testów xUnit, pełny zestaw verify-stage weapons PASS. Dodatkowy smoke poziomu 5: salwy i 10 pól EMP. Utrata hosta sprawdzana na logu UTF-8, niezależnie od kodowania konsoli.

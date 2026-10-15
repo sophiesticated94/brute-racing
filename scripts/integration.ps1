@@ -12,6 +12,7 @@ function Start-GameProcess([string]$name, [string[]]$extra) {
     $info.CreateNoWindow = $true
     $info.RedirectStandardOutput = $true
     $info.RedirectStandardError = $true
+    $info.StandardOutputEncoding = [System.Text.Encoding]::UTF8; $info.StandardErrorEncoding = [System.Text.Encoding]::UTF8
     $allArgs = @('--headless','--path',(Join-Path $RepoRoot 'src/Game.Client'),'--log-file',"$testRoot/$name.engine.log",'--max-fps','60','--','--smoke',"--port=$Port", "--rounds=$Rounds", "--timeout=$(210 * $Rounds)","--name=$name", "--results=$testRoot/$name.json") + $extra
     if (!$Combat) { $allArgs += '--no-weapons' }
     if ($Impaired) { $allArgs += @('--latency=50','--loss=0.03') }

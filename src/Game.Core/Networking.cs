@@ -31,12 +31,12 @@ public sealed class InputGate
 public sealed record VehicleState(int Id, Vector3 Position, Quaternion Rotation, Vector3 Velocity,
     Vector3 AngularVelocity, float TurretYaw, float Health, float Energy, float Heat,
     int Ammo, int Mines, int Lap, int NextCheckpoint, int PassedGates, float Respawn,
-    float Invulnerability, uint AcknowledgedSequence, double FinishTime);
+    float Invulnerability, uint AcknowledgedSequence, double FinishTime, float SlowRemaining = 0, float SlowFactor = 1);
 
 public sealed record WorldSnapshot(uint RaceId, uint Tick, RacePhase Phase, double Elapsed, float Remaining, VehicleState[] Vehicles);
-public sealed record RaceEvent(uint RaceId, long EventId, string Kind, int Actor, int Target, Vector3 Position, Vector3 End, float Value);
+public sealed record RaceEvent(uint RaceId, long EventId, string Kind, int Actor, int Target, Vector3 Position, Vector3 End, float Value, WeaponDefinition? Weapon = null);
 public sealed record LobbyPlayer(int Id, string Name, int Color, bool Ready, bool Bot, PlayerLoadoutDto Loadout);
-public sealed record SessionMessage(string Kind, int Protocol = 1, string ContentHash = "",
+public sealed record SessionMessage(string Kind, int Protocol = 2, string ContentHash = "",
     string Name = "", int Color = 0, PlayerLoadoutDto? Loadout = null,
     LobbyPlayer[]? Players = null, string Message = "", int[]? Ranking = null, uint RaceId = 0, double SentTime = 0);
 
@@ -98,6 +98,7 @@ public static class PacketCodec
             Write(w, v.Velocity); Write(w, v.AngularVelocity); w.Write(v.TurretYaw); w.Write(v.Health); w.Write(v.Energy); w.Write(v.Heat);
             w.Write(v.Ammo); w.Write(v.Mines); w.Write(v.Lap); w.Write(v.NextCheckpoint); w.Write(v.PassedGates);
             w.Write(v.Respawn); w.Write(v.Invulnerability); w.Write(v.AcknowledgedSequence); w.Write(v.FinishTime);
+            w.Write(v.SlowRemaining); w.Write(v.SlowFactor);
         }
         return stream.ToArray();
     }
@@ -112,10 +113,10 @@ public static class PacketCodec
             int id = r.ReadInt32(); var position = ReadVector(r); var rotation = new Quaternion(r.ReadSingle(), r.ReadSingle(), r.ReadSingle(), r.ReadSingle());
             var velocity = ReadVector(r); var angular = ReadVector(r);
             var v = new VehicleState(id, position, rotation, velocity, angular, r.ReadSingle(), r.ReadSingle(), r.ReadSingle(), r.ReadSingle(),
-                r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadSingle(), r.ReadSingle(), r.ReadUInt32(), r.ReadDouble());
+                r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadSingle(), r.ReadSingle(), r.ReadUInt32(), r.ReadDouble(), r.ReadSingle(), r.ReadSingle());
             if (!ids.Add(id) || !float.IsFinite(rotation.LengthSquared()) || rotation.LengthSquared() < .5f || rotation.LengthSquared() > 1.5f ||
                 !float.IsFinite(v.Health) || !float.IsFinite(v.Energy) || !float.IsFinite(v.Heat) || !float.IsFinite(v.TurretYaw) ||
-                !float.IsFinite(v.Respawn) || !float.IsFinite(v.Invulnerability) || !double.IsFinite(v.FinishTime)) throw new InvalidDataException("Vehicle values.");
+                !float.IsFinite(v.Respawn) || !float.IsFinite(v.Invulnerability) || !double.IsFinite(v.FinishTime) || !float.IsFinite(v.SlowRemaining) || !float.IsFinite(v.SlowFactor)) throw new InvalidDataException("Vehicle values.");
             cars[i] = v;
         }
         if (r.BaseStream.Position != r.BaseStream.Length) throw new InvalidDataException("Trailing snapshot bytes.");

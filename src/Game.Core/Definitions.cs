@@ -9,7 +9,14 @@ public sealed record CarDefinition(string Id, string Name, float MaxSpeed, float
 
 public sealed record WeaponDefinition(string Id, string Name, float Damage, float FireRate,
     float Range, float ProjectileSpeed, float SplashRadius, float KnockbackForce,
-    int AmmoCapacity, float EnergyConsumption, float HeatGeneration);
+    int AmmoCapacity, float EnergyConsumption, float HeatGeneration,
+    int Level = 1, int UpgradeCost = 0, float CoolingRate = 23, float EnergyRegen = 18,
+    float OverheatResume = 30, float OverheatThreshold = 95, float ArmingTime = .5f,
+    int MaxActive = 4, float ArmorPenetration = 0, int ProjectileCount = 1,
+    float SlowFactor = 1, float SlowDuration = 0, WeaponPerkFlags Perks = WeaponPerkFlags.None);
+
+[Flags]
+public enum WeaponPerkFlags { None = 0, ArmorPierce = 1, LaserPierce = 2, Salvo = 4, EmpField = 8, FastArming = 16 }
 
 public sealed record TrackDefinition(string Id, string Name, int Laps, float RadiusX,
     float RadiusZ, float Width, int Segments, int Checkpoints);
@@ -19,6 +26,8 @@ public sealed class GameCatalog
     public static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase, IncludeFields = true };
     public Dictionary<string, CarDefinition> Cars { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, WeaponDefinition> Weapons { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, WeaponDefinition[]> WeaponLevels { get; } = new(StringComparer.Ordinal);
+    public static string[] Files => ["cars/rook.json", "weapons/weapons.json", "tracks/cinder.json"];
     public TrackDefinition Track { get; private set; } = null!;
 
     public static GameCatalog Load(Func<string, string> read)
@@ -30,12 +39,12 @@ public sealed class GameCatalog
             car.Armor is < 0 or >= 1 || car.Grip <= 0 || car.Acceleration <= 0 || car.Braking <= 0)
             throw new InvalidDataException("Nieprawidłowa definicja samochodu.");
         catalog.Cars.Add(car.Id, car);
-        foreach (var weapon in JsonSerializer.Deserialize<WeaponDefinition[]>(read("weapons/weapons.json"), Json)!)
+        foreach (var group in JsonSerializer.Deserialize<WeaponDefinition[]>(read("weapons/weapons.json"), Json)!.GroupBy(w => w.Id, StringComparer.Ordinal))
         {
-            if (string.IsNullOrWhiteSpace(weapon.Id) || !float.IsFinite(weapon.Damage) || weapon.Damage <= 0 ||
-                weapon.FireRate <= 0 || weapon.Range <= 0 || weapon.AmmoCapacity < 0 || weapon.EnergyConsumption < 0)
-                throw new InvalidDataException("Nieprawidłowa definicja broni.");
-            catalog.Weapons.Add(weapon.Id, weapon);
+            var levels = group.OrderBy(w => w.Level).ToArray();
+            if (levels.Length != 5 || !levels.Select(w => w.Level).SequenceEqual(Enumerable.Range(1, 5))) throw new InvalidDataException("Broń wymaga poziomów 1–5.");
+            foreach (var weapon in levels) StatLimits.ValidateWeapon(weapon);
+            catalog.Weapons.Add(group.Key, levels[0]); catalog.WeaponLevels.Add(group.Key, levels);
         }
         foreach (var required in new[] { "machine_gun", "laser", "rocket", "mine" })
             if (!catalog.Weapons.ContainsKey(required)) throw new InvalidDataException($"Brak broni: {required}");
@@ -48,7 +57,7 @@ public sealed class GameCatalog
 }
 
 public sealed record PlayerLoadoutDto(string CarId, string WeaponId, int WeaponLevel,
-    Dictionary<string, int> SkillRanks)
+    Dictionary<string, int> SkillRanks, int MineLevel = 1)
 {
     public static PlayerLoadoutDto Default => new("rook", "machine_gun", 1, new());
 }
@@ -58,14 +67,19 @@ public sealed class BuildValidator(GameCatalog catalog)
     public bool IsValid(PlayerLoadoutDto? loadout) => loadout is not null &&
         catalog.Cars.ContainsKey(loadout.CarId ?? "") &&
         catalog.Weapons.ContainsKey(loadout.WeaponId ?? "") && loadout.WeaponId != "mine" &&
-        loadout.WeaponLevel == 1 && loadout.SkillRanks is { Count: 0 };
+        loadout.WeaponLevel is >= 1 and <= 5 && loadout.MineLevel is >= 1 and <= 5 && loadout.SkillRanks is { Count: 0 };
 }
 
 public static class VehicleStatsCalculator
 {
     public static CarDefinition Calculate(GameCatalog catalog, PlayerLoadoutDto loadout)
+        => CalculateBuild(catalog, loadout).Vehicle;
+
+    public static ComputedLoadoutStats CalculateBuild(GameCatalog catalog, PlayerLoadoutDto loadout)
     {
         if (!new BuildValidator(catalog).IsValid(loadout)) throw new ArgumentException("Nieprawidłowy build.", nameof(loadout));
-        return catalog.Cars[loadout.CarId] with { };
+        return new(StatLimits.ClampCar(catalog.Cars[loadout.CarId]),
+            StatLimits.ClampWeapon(catalog.WeaponLevels[loadout.WeaponId][loadout.WeaponLevel - 1]),
+            StatLimits.ClampWeapon(catalog.WeaponLevels["mine"][loadout.MineLevel - 1]), new());
     }
 }

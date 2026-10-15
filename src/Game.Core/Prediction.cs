@@ -3,7 +3,7 @@ using System.Numerics;
 namespace Game.Core;
 
 public readonly record struct PredictionState(Vector3 Position, Vector3 Velocity, float Yaw, float AngularSpeed = 0);
-public readonly record struct PredictedInput(PlayerInputCommand Command, bool Grounded, float SurfaceGrip, float GroundHeight);
+public readonly record struct PredictedInput(PlayerInputCommand Command, bool Grounded, float SurfaceGrip, float GroundHeight, float MovementScale = 1);
 
 // A bounded local approximation for replaying unacknowledged commands. Jolt on the host
 // resolves collisions; replay deliberately does not rewind other cars or the world.
@@ -18,8 +18,8 @@ public static class MovementPrediction
         if (input.Grounded)
         {
             float speed = Vector3.Dot(velocity, forward);
-            if (MathF.Abs(speed) < (c.Throttle >= 0 ? car.MaxSpeed : car.ReverseSpeed) || MathF.Sign(c.Throttle) != MathF.Sign(speed))
-                velocity += forward * c.Throttle * car.Acceleration * dt;
+            if (MathF.Abs(speed) < (c.Throttle >= 0 ? car.MaxSpeed : car.ReverseSpeed) * input.MovementScale || MathF.Sign(c.Throttle) != MathF.Sign(speed))
+                velocity += forward * c.Throttle * car.Acceleration * input.MovementScale * dt;
             velocity -= right * Vector3.Dot(velocity, right) * car.Grip * input.SurfaceGrip * (c.Handbrake ? car.DriftFactor : 1) * dt;
             if (c.Brake > 0 || (c.Throttle < 0 && speed > 1))
                 velocity -= forward * MathF.Sign(speed) * MathF.Min(MathF.Abs(speed) / dt, car.Braking) * MathF.Max(c.Brake, -c.Throttle) * dt;

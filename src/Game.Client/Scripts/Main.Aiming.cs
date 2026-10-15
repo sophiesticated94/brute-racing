@@ -18,7 +18,7 @@ public partial class Main
         var direction = new Vector3(-Mathf.Sin(r.Car.TurretYaw), 0, -Mathf.Cos(r.Car.TurretYaw));
         var mesh = new ImmediateMesh(); mesh.SurfaceBegin(Mesh.PrimitiveType.Lines, Art.Material(new("dfbc68"), true));
         Vector3 previous = default;
-        float range = catalog.Weapons[r.Info.Loadout.WeaponId].Range;
+        float range = r.Build.Primary.Range;
         for (int i = 0; i <= 16; i++)
         {
             var p = r.Car.GlobalPosition + direction * (1.7f + range * i / 16);

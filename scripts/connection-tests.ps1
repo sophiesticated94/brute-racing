@@ -9,6 +9,7 @@ function Launch([string]$name, [int]$udpPort, [string[]]$extra) {
     $info = [System.Diagnostics.ProcessStartInfo]::new()
     $info.FileName = $engine; $info.UseShellExecute = $false; $info.CreateNoWindow = $true
     $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+    $info.StandardOutputEncoding = [System.Text.Encoding]::UTF8; $info.StandardErrorEncoding = [System.Text.Encoding]::UTF8
     $engineLog = Join-Path $testRoot "$name.engine.log"
     $argsForGame = @('--headless','--path',(Join-Path $RepoRoot 'src/Game.Client'),'--log-file',$engineLog,'--max-fps','60','--',"--port=$udpPort",'--bots=0','--autoplay','--no-weapons',"--name=$name") + $extra
     foreach ($argForGame in $argsForGame) { $info.ArgumentList.Add($argForGame) }
@@ -47,7 +48,7 @@ try {
     if (!$survivingClient.Process.WaitForExit(20000)) { throw 'Klient nie obsłużył utraty hosta.' }
     $clientOutput = $survivingClient.Output.GetAwaiter().GetResult()
     $clientError = $survivingClient.Error.GetAwaiter().GetResult()
-    if ($survivingClient.Process.ExitCode -ne 0 -or $clientOutput -notmatch 'Gospodarz zakończył połączenie' -or $clientError -match 'ERROR:|Fatal|Exception') { throw 'Błąd klienta po utracie hosta.' }
+    if ($survivingClient.Process.ExitCode -ne 0 -or (Get-Content -LiteralPath $survivingClient.Log -Raw -Encoding utf8) -notmatch 'Gospodarz zakończył połączenie' -or $clientError -match 'ERROR:|Fatal|Exception') { throw 'Błąd klienta po utracie hosta.' }
     Write-Host "PASS: przejęcie auta przez AI i bezpieczna utrata hosta. Logi: $testRoot"
 } finally {
     foreach ($entry in $running) {

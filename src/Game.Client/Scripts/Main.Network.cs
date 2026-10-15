@@ -79,7 +79,7 @@ public partial class Main
             if (m.Kind == "hello")
             {
                 if (phase != RacePhase.Lobby || acceptedHello.ContainsKey(sender)) { transport?.Disconnect(sender); return; }
-                if (m.Protocol != 1 || m.ContentHash != contentHash || !new BuildValidator(catalog).IsValid(m.Loadout) || m.Color is < 0 or > 7 || m.Name is null || m.Name.Length > 20)
+                if (m.Protocol != 2 || m.ContentHash != contentHash || !new BuildValidator(catalog).IsValid(m.Loadout) || m.Color is < 0 or > 7 || m.Name is null || m.Name.Length > 20)
                 {
                     SendControl(sender, new("error", Message: "Niezgodna wersja gry, dane lub build.")); transport?.Disconnect(sender); return;
                 }
@@ -143,7 +143,7 @@ public partial class Main
     private WorldSnapshot CreateSnapshot() => new(raceId, tick, phase, raceElapsed, raceRemaining, racers.Values.Select(r =>
         new VehicleState(r.Info.Id, Art.Numerics(r.Car.GlobalPosition), Art.Numerics(r.Car.Quaternion), Art.Numerics(r.Car.LinearVelocity), Art.Numerics(r.Car.AngularVelocity),
             r.Car.TurretYaw, r.Car.Health, r.Energy, r.Heat, r.Ammo, r.Mines, r.Progress.CompletedLaps, r.Progress.NextCheckpoint, r.Progress.PassedGates,
-            r.Respawn, r.Invulnerable, r.Car.LastSimulatedSequence, r.Progress.FinishTime ?? -1)).ToArray());
+            r.Respawn, r.Invulnerable, r.Car.LastSimulatedSequence, r.Progress.FinishTime ?? -1, r.SlowRemaining, r.SlowFactor)).ToArray());
     private void ApplySnapshot(WorldSnapshot s)
     {
         if (s.RaceId != raceId || s.Tick <= lastSnapshotTick) return;
@@ -162,7 +162,7 @@ public partial class Main
                 else if (r.Overheated && state.Heat < 30) { r.Overheated = false; ui.Notice("LASER GOTOWY", 2); }
             }
             r.Ammo = state.Ammo; r.Mines = state.Mines; r.Respawn = state.Respawn; r.Invulnerable = state.Invulnerability;
-            r.Car.Invulnerability = state.Invulnerability;
+            r.Car.Invulnerability = state.Invulnerability; r.Car.MovementScale = state.SlowRemaining > 0 ? state.SlowFactor : 1;
             r.Car.CollisionLayer = state.Id != localId || state.Respawn > 0 ? 0u : state.Invulnerability > 0 ? 4u : 2u;
             r.Car.CollisionMask = state.Id == localId ? 1u : 0u;
             if (state.Id == localId)
