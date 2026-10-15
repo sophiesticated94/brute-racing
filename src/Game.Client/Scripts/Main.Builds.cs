@@ -44,7 +44,7 @@ public partial class Main
     }
     private void SetBalance(LobbyBalanceMode mode)
     {
-        if (inSession && !isHost || phase != RacePhase.Lobby) return;
+        if (inSession && (!isHost || gameMode==GameMode.Quick) || phase != RacePhase.Lobby) return;
         balanceRules = mode switch { LobbyBalanceMode.Stock => LobbyBalanceRules.Stock, LobbyBalanceMode.FairCap => LobbyBalanceRules.FairCap, _ => LobbyBalanceRules.OpenMayhem };
         if (isHost && inSession)
         {

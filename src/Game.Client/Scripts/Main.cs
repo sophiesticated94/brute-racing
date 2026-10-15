@@ -216,7 +216,7 @@ public partial class Main : Node3D
     {
         if (!inSession) return;
         if(campaign is not null)SynchronizeCampaign();
-        var all = players.Values.ToArray(); ui.ShowLobby(all, isHost, localId); ui.ShowBalance(balanceRules,isHost); SendControl(0, new("lobby", Players: all, BalanceRules: balanceRules));
+        var all = players.Values.ToArray(); ui.ShowLobby(all, isHost, localId); ui.ShowBalance(balanceRules,isHost && gameMode!=GameMode.Quick); SendControl(0, new("lobby", Players: all, BalanceRules: balanceRules));
     }
     private void TryStartRace()
     {

@@ -62,7 +62,8 @@ gotowość. Host liczy statystyki i kontroluje własność w kampanii. Klient ni
 zatwierdzić trafienia, pozycji, okrążenia, zakupu ani nagrody. Protokół kontrolny
 ma limit 32 KiB; binarne snapshoty ośmiu aut nadal mieszczą się w 1200 bajtach.
 
-Quick zamraża build zadeklarowany w kolejce. Hello zawiera GUID oferty i biletu;
+Quick zamraża build zadeklarowany w kolejce oraz reguły OpenMayhem; host nie może
+zmienić limitów ocenionej oferty. Hello zawiera GUID oferty i biletu;
 host sprawdza skład oraz dokładny build z oferty. Bilet ma losowy sekret HTTP,
 który nie jest przesyłany pozostałym graczom. Oferta wymaga potwierdzenia ENet
 przez wszystkich uczestników. Timeout cofa ofertę, blokuje poprzedniego hosta
