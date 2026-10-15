@@ -21,6 +21,8 @@ public partial class GameUi : CanvasLayer
     private Label notice = null!;
     private double noticeTime;
     private RaceMap map = null!;
+    private AimReticle reticle = null!;
+    public void HitMarker() => reticle.Hit();
     private static readonly Color Ink = new("e8eddf"), Muted = new("8da8af"), Accent = new("ffbe45");
     public string WeaponId => new[] { "machine_gun", "laser", "rocket" }[(int)Weapon.Selected];
     public override void _Ready()
@@ -80,7 +82,7 @@ public partial class GameUi : CanvasLayer
         var mapPanel = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, AnchorTop = 1, AnchorBottom = 1, OffsetLeft = -288, OffsetRight = -32, OffsetTop = -224, OffsetBottom = -48, MouseFilter = Control.MouseFilterEnum.Ignore };
         mapPanel.AddThemeStyleboxOverride("panel", PanelStyle()); hud.AddChild(mapPanel);
         map = new RaceMap { CustomMinimumSize = new(224, 140), MouseFilter = Control.MouseFilterEnum.Ignore }; mapPanel.AddChild(map);
-        hud.AddChild(new AimReticle { MouseFilter = Control.MouseFilterEnum.Ignore, ZIndex = 5 });
+        reticle = new AimReticle { MouseFilter = Control.MouseFilterEnum.Ignore, ZIndex = 5 }; hud.AddChild(reticle);
         podium = Card(new(38, 87), new(510, 610)); var p = Stack(podium);
         AddText(p, "META.", 64, Accent); AddText(p, "KLASYFIKACJA KOŃCOWA", 17, Muted);
         result = AddText(p, "", 23, Ink); result.CustomMinimumSize = new(0, 325);

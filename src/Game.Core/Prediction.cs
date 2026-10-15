@@ -23,15 +23,15 @@ public static class MovementPrediction
             velocity -= right * Vector3.Dot(velocity, right) * car.Grip * input.SurfaceGrip * (c.Handbrake ? car.DriftFactor : 1) * dt;
             if (c.Brake > 0 || (c.Throttle < 0 && speed > 1))
                 velocity -= forward * MathF.Sign(speed) * MathF.Min(MathF.Abs(speed) / dt, car.Braking) * MathF.Max(c.Brake, -c.Throttle) * dt;
-            float turn = -c.Steering * car.TurnSpeed * Math.Clamp(MathF.Abs(speed) / 7, 0, 1) * (speed < -1 ? -1 : 1);
-            angular += (turn - angular) * Math.Clamp(dt * 9, 0, 1);
+            float turn = MovementTuning.TurnTarget(c.Steering, speed, car.TurnSpeed);
+            angular += (turn - angular) * Math.Clamp(dt * MovementTuning.SteeringResponse, 0, 1);
             float springAcceleration = 4 * car.Spring / car.Mass;
-            float equilibriumHeight = car.SuspensionLength - 9.8f * 1.8f / springAcceleration;
+            float equilibriumHeight = car.SuspensionLength - MovementTuning.Gravity * MovementTuning.GravityScale / springAcceleration;
             velocity.Y += ((input.GroundHeight + equilibriumHeight - state.Position.Y) * springAcceleration - velocity.Y * 4 * car.Damping / car.Mass) * dt;
         }
-        else velocity.Y -= 9.8f * 1.8f * dt;
-        velocity *= 1 - .12f * dt;
-        angular *= 1 - 2.5f * dt;
+        else velocity.Y -= MovementTuning.Gravity * MovementTuning.GravityScale * dt;
+        velocity *= 1 - MovementTuning.LinearDamping * dt;
+        angular *= 1 - MovementTuning.AngularDamping * dt;
         yaw += angular * dt;
         return new(state.Position + velocity * dt, velocity, yaw, angular);
     }

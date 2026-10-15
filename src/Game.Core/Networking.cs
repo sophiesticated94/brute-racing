@@ -38,7 +38,7 @@ public sealed record RaceEvent(uint RaceId, long EventId, string Kind, int Actor
 public sealed record LobbyPlayer(int Id, string Name, int Color, bool Ready, bool Bot, PlayerLoadoutDto Loadout);
 public sealed record SessionMessage(string Kind, int Protocol = 1, string ContentHash = "",
     string Name = "", int Color = 0, PlayerLoadoutDto? Loadout = null,
-    LobbyPlayer[]? Players = null, string Message = "", int[]? Ranking = null, uint RaceId = 0);
+    LobbyPlayer[]? Players = null, string Message = "", int[]? Ranking = null, uint RaceId = 0, double SentTime = 0);
 
 public interface INetworkTransport : IDisposable
 {

@@ -18,6 +18,7 @@ public partial class ArcadeCar : RigidBody3D
     public Marker3D Muzzle { get; private set; } = null!;
     public Marker3D MineMount { get; private set; } = null!;
     public Vector3 VisualOffset;
+    public bool HardResetPending;
     public bool Grounded { get; private set; }
     public uint LastSimulatedSequence { get; private set; }
     private Node3D turret = null!;
@@ -32,16 +33,16 @@ public partial class ArcadeCar : RigidBody3D
 
     public void Reconcile(Vector3 position, Quaternion rotation, Vector3 velocity, Vector3 angular)
     {
-        if (GlobalPosition.DistanceTo(position) < 4) VisualOffset += GlobalPosition - position;
+        if (!HardResetPending && GlobalPosition.DistanceTo(position) < MovementTuning.TeleportDistance) VisualOffset += GlobalPosition - position;
         else VisualOffset = Vector3.Zero;
-        VisualOffset = VisualOffset.LimitLength(3);
+        HardResetPending = false;
         reconciliation = (position, rotation, velocity, angular);
     }
 
     public void Build(CarDefinition stats, Color color, bool simulate)
     {
         Stats = stats; Health = stats.MaxHealth; Simulating = simulate;
-        Mass = stats.Mass; GravityScale = 1.8f; LinearDamp = .12f; AngularDamp = 2.5f;
+        Mass = stats.Mass; GravityScale = MovementTuning.GravityScale; LinearDamp = MovementTuning.LinearDamping; AngularDamp = MovementTuning.AngularDamping;
         ContinuousCd = true; ContactMonitor = false; MaxContactsReported = 0;
         CollisionLayer = 2; CollisionMask = 3;
         CenterOfMassMode = CenterOfMassModeEnum.Custom; CenterOfMass = new(0, -.25f, 0);
@@ -128,10 +129,10 @@ public partial class ArcadeCar : RigidBody3D
                     state.ApplyCentralForce(-forward * Mathf.Sign(speed) * Mathf.Min(Mathf.Abs(speed) / dt, Stats.Braking) * Stats.Mass * Mathf.Max(Command.Brake, -throttle));
                 float grip = Stats.Grip * SurfaceGrip * (Command.Handbrake ? Stats.DriftFactor : 1);
                 state.ApplyCentralForce(-right * velocity.Dot(right) * grip * Stats.Mass);
-                float turn = -Command.Steering * Stats.TurnSpeed * Mathf.Clamp(Mathf.Abs(speed) / 7, 0, 1) * (speed < -1 ? -1 : 1);
+                float turn = MovementTuning.TurnTarget(Command.Steering, speed, Stats.TurnSpeed);
                 var angular = state.AngularVelocity;
-                angular.Y = Mathf.Lerp(angular.Y, turn, Mathf.Clamp(dt * 9, 0, 1)); state.AngularVelocity = angular;
-                state.ApplyCentralForce(-Vector3.Up * Stats.Mass * Mathf.Abs(speed) * .15f);
+                angular.Y = Mathf.Lerp(angular.Y, turn, Mathf.Clamp(dt * MovementTuning.SteeringResponse, 0, 1)); state.AngularVelocity = angular;
+                state.ApplyCentralForce(-Vector3.Up * Stats.Mass * Mathf.Abs(speed) * MovementTuning.Downforce);
             }
             var correction = up.Cross(Vector3.Up);
             state.ApplyTorque(correction * Stats.Mass * (Grounded ? 14 : 8));
@@ -148,7 +149,7 @@ public partial class ArcadeCar : RigidBody3D
     public override void _Process(double delta)
     {
         if (Visual is null) return;
-        VisualOffset = VisualOffset.Lerp(Vector3.Zero, 1 - Mathf.Exp(-(float)delta * 12));
+        VisualOffset = VisualOffset.Lerp(Vector3.Zero, MovementTuning.Decay((float)delta));
         Visual.Position = VisualOffset;
         float bodyYaw = GlobalBasis.GetEuler().Y;
         turret.Rotation = new(0, Mathf.Wrap(TurretYaw - bodyYaw, -Mathf.Pi, Mathf.Pi), 0);
@@ -172,5 +173,7 @@ public partial class ArcadeCar : RigidBody3D
             var puff = Art.Box(GetParent<Node3D>(), new(.3f, .3f, .3f), GlobalPosition + Vector3.Up, new("4e5156"));
             var t = puff.CreateTween(); t.SetParallel(); t.TweenProperty(puff, "position", puff.Position + Vector3.Up * 2, .8); t.TweenProperty(puff, "scale", Vector3.Zero, .8); t.Chain().TweenCallback(Callable.From(puff.QueueFree));
         }
+        if (Health > 0 && Health < Stats.MaxHealth * .18f && smokeTime > .15)
+            Art.Burst(GetParent<Node3D>(), GlobalPosition + Vector3.Up * .5f, new("ff953e"), .35f);
     }
 }

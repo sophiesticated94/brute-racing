@@ -5,7 +5,7 @@ namespace Game.Core;
 public sealed record CarDefinition(string Id, string Name, float MaxSpeed, float Acceleration,
     float Braking, float ReverseSpeed, float Grip, float DriftFactor, float TurnSpeed,
     float Mass, float MaxHealth, float Armor, float KnockbackResistance,
-    float Spring, float Damping, float SuspensionLength);
+    float Spring, float Damping, float SuspensionLength, float TurretTraverseSpeed = 4.5f);
 
 public sealed record WeaponDefinition(string Id, string Name, float Damage, float FireRate,
     float Range, float ProjectileSpeed, float SplashRadius, float KnockbackForce,
