@@ -274,7 +274,7 @@ public partial class Main : Node3D
     private void PhysicsTick(double delta)
     {
         if (catalog is null) return;
-        now += delta; transport?.Poll(); FlushDelayed();UpdateQuick();TickCampaignPersistence();SyncSessionState();
+        now += delta; transport?.Poll(); FlushDelayed();UpdateQuick();if(arguments.ContainsKey("queue-cancel-smoke"))RunQueueSmoke();TickCampaignPersistence();SyncSessionState();
         if(arguments.ContainsKey("input-smoke")){try{RunInputSmoke();}catch(Exception e){GD.PushError(e.ToString());GetTree().Quit(4);}return;}
         if(isHost)foreach(var peer in acceptedHello.Where(p=>now-p.Value>10).Select(p=>p.Key).ToArray()){transport?.Disconnect(peer);HandlePeerLost(peer);}
         if (inSession && !isHost && transport is not null && now >= nextPing)

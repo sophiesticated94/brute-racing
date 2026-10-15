@@ -27,8 +27,7 @@ docker run --rm -p 5080:8080 brute-racing-directory
 
 Obraz publikuje API w Release, działa jako użytkownik bez uprawnień root i nie
 wymaga woluminu ani bazy. Restart usuwa kolejkę; klienci mogą wyszukać ponownie.
-Publiczne wdrożenie powinno udostępnić HTTPS (np. reverse proxy), limitowanie
-ruchu i monitoring. Nie włączono automatycznego zaufania do nagłówków forwarded;
+Publiczne wdrożenie powinno udostępnić HTTPS (np. reverse proxy) i monitoring. Nie włączono automatycznego zaufania do nagłówków forwarded;
 API wybiera adres hosta na podstawie bezpośredniego połączenia. Jeśli reverse
 proxy ukrywa adres nadawcy, skonfiguruj zaufane proxy przed takim wdrożeniem.
 Przy lokalnym wywołaniu dopuszczony jest jawny adres LAN do testów.
@@ -37,7 +36,7 @@ Przy lokalnym wywołaniu dopuszczony jest jawny adres LAN do testów.
 
 | Metoda / ścieżka | Znaczenie |
 |---|---|
-| GET `/health` | protokół 3 i SHA-256 danych |
+| GET `/health` | protokół 4 i SHA-256 danych |
 | GET `/address` | obserwowany adres nadawcy |
 | POST `/queue` | deklaracja buildu, ID gracza, nazwa, port, hash i możliwość hostowania |
 | GET `/queue/{id}` | heartbeat i stan kolejki/oferty |
@@ -60,3 +59,25 @@ NAT/CGNAT bez dostępnego portu UDP nadal wymaga relaya, którego nie ma w zakre
 Test pełnego przepływu: `scripts/quick-integration.ps1 -UnreachableHost`.
 Uruchamia lokalny API i dwa prawdziwe procesy Godota, najpierw oferując celowo
 nieosiągalny port, a potem sprawdza wspólną grę i identyczne wyniki.
+
+## Konflikty i limity (Faza 0)
+
+Aktywny ClientId zwraca **409** i `Retry-After: 60`, bez usuwania biletu ani oferty.
+Zastąpienie wymaga DELETE z dotychczasowym sekretem lub wygaśnięcia. Klient quick
+czeka na potwierdzenie anulowania przed kolejnym enqueue. Jeśli po restarcie nie
+ma sekretu, pokazuje oczekiwanie i ponawia po wygaśnięciu starego wpisu.
+
+Limit ogólny per IP: 120 żądań początkowo, odnawianie 20/s. Enqueue ma dodatkowo
+8 żądań i odnawianie 1/s. Osiem osób za jednym NAT-em może normalnie wejść i
+wysyłać heartbeat. 429 zawiera Retry-After. Kolejka ma 1024 wpisy; pełna zwraca
+429 z Retry-After 5 s. Body, także chunked, ma 32 KiB, głębokość JSON 16;
+przekroczenie zwraca 413 przed zmianą kolejki.
+
+Konfiguracja przez sekcję RequestLimits w konfiguracji ASP.NET lub zmienne:
+`RequestLimits__Capacity`, `RequestLimits__RefillPerSecond`,
+`RequestLimits__EnqueueCapacity`, `RequestLimits__EnqueueRefillPerSecond`.
+Nie ufamy X-Forwarded-For bez jawnie skonfigurowanego zaufanego proxy.
+
+Powtórzenie kontroli HTTP: `scripts/directory-security-tests.ps1`.
+Kontrola klienta, anulowania i odzyskania po utracie sekretu:
+`scripts/quick-cancel-tests.ps1 -Orphan`. Wszystkie dane testowe są w artifacts.

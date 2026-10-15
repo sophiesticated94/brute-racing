@@ -89,6 +89,39 @@ public class MatchmakingTests
         Assert.Equal(.15f,queue.Poll(a.Id,a.Secret).Tolerance);clock.Advance(25);
         Assert.Equal(.25f,queue.Poll(a.Id,a.Secret).Tolerance);
     }
+    [Fact]
+    public void DuplicateClientCannotReplaceTicketOrInvalidateOffer()
+    {
+        var catalog=DomainTests.Catalog();var clock=new ManualClock();var queue=new MatchQueue(catalog,clock);
+        var request=Request(catalog);var ticket=queue.Enqueue(request,"127.0.0.1");
+        var other=queue.Enqueue(Request(catalog),"127.0.0.1");clock.Advance(15);
+        var before=queue.Poll(ticket.Id,ticket.Secret);
+        Assert.Throws<QueueConflictException>(()=>queue.Enqueue(request with{Name="Attacker"},"127.0.0.1"));
+        Assert.Equal(before.Offer,queue.Poll(ticket.Id,ticket.Secret).Offer);
+        Assert.Equal(before.Offer,queue.Poll(other.Id,other.Secret).Offer);
+        queue.Cancel(ticket.Id,ticket.Secret);
+        Assert.NotEqual(ticket.Id,queue.Enqueue(request,"127.0.0.1").Id);
+    }
+    [Fact]
+    public void IpBucketsAllowEightClientsAndRefillWithoutStateChangesOnRejection()
+    {
+        var clock=new ManualClock();var limiter=new RequestLimiter(clock,new());
+        for(int i=0;i<8;i++)Assert.True(limiter.Accept("nat",true,out _));
+        Assert.False(limiter.Accept("nat",true,out int retry));Assert.Equal(1,retry);
+        for(int i=0;i<100;i++)Assert.True(limiter.Accept("nat",false,out _));
+        clock.Advance(1);Assert.True(limiter.Accept("nat",true,out _));
+        for(int i=0;i<8;i++)Assert.True(limiter.Accept("other",true,out _));
+        for(int i=0;i<200;i++)limiter.Accept("nat",false,out _);
+        Assert.False(limiter.Accept("nat",false,out _));clock.Advance(6);Assert.True(limiter.Accept("nat",false,out _));
+    }
+    [Fact]
+    public void FullQueueRejectsTheNextEntryAndRetainsExistingTickets()
+    {
+        var catalog=DomainTests.Catalog();var queue=new MatchQueue(catalog,new ManualClock());
+        var tickets=Enumerable.Range(0,1024).Select(_=>queue.Enqueue(Request(catalog),"127.0.0.1")).ToArray();
+        Assert.Throws<QueueCapacityException>(()=>queue.Enqueue(Request(catalog),"127.0.0.1"));
+        Assert.Equal("offer",queue.Poll(tickets[0].Id,tickets[0].Secret).State);
+    }
     [Theory]
     [InlineData("127.0.0.1",28747)]
     [InlineData("2001:db8::1",65535)]

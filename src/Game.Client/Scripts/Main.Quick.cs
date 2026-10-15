@@ -9,6 +9,8 @@ namespace Game.Client;
 public partial class Main
 {
     private readonly System.Net.Http.HttpClient directoryHttp=new(){Timeout=TimeSpan.FromSeconds(5)};
+    private readonly SemaphoreSlim queueMutation=new(1,1);
+    private Task queueCancellation=Task.CompletedTask;
     private QueueTicket? queueTicket;
     private PlayerLoadoutDto? queuedBuild;
     private MatchOffer? quickOffer;
@@ -17,7 +19,7 @@ public partial class Main
     private bool queueBusy,queueAcknowledged,quickStartApproved;
     private double nextQueuePoll;
     private readonly Dictionary<int,Guid> quickPeers=[];
-    private int quickOffers,quickRetries;
+    private int quickOffers,quickRetries,quickConflicts;
 
     private async void StartQuick()
     {
@@ -31,11 +33,37 @@ public partial class Main
         {
             using var health=await directoryHttp.GetAsync(url+"/health");health.EnsureSuccessStatusCode();
             using var document=JsonDocument.Parse(await health.Content.ReadAsStringAsync());
-            if(document.RootElement.GetProperty("contentHash").GetString()!=contentHash)throw new InvalidDataException("Katalog wymaga tej samej wersji danych gry.");
+            var root=document.RootElement;
+            if(root.ValueKind!=JsonValueKind.Object||!root.TryGetProperty("protocol",out var version)||version.ValueKind!=JsonValueKind.Number||!version.TryGetInt32(out int protocol)||protocol!=4||
+                !root.TryGetProperty("contentHash",out var hash)||hash.ValueKind!=JsonValueKind.String||hash.GetString()!=contentHash)
+                throw new InvalidDataException("Katalog wymaga protokołu 4 i tej samej wersji danych gry.");
             var request=new QueueRequest(profile.PlayerId,CleanName(SelectedName()),RequestedLoadout(),(int)ui.Port.Value,contentHash,!arguments.ContainsKey("no-host"));
-            using var response=await directoryHttp.PostAsJsonAsync(url+"/queue",request,GameCatalog.Json);response.EnsureSuccessStatusCode();
-            var ticket=await response.Content.ReadFromJsonAsync<QueueTicket>(GameCatalog.Json)??throw new InvalidDataException("Pusta odpowiedź katalogu.");
-            if(generation!=queueGeneration){_ = DeleteTicket(url,ticket);return;}
+            if(!queueCancellation.IsCompleted)ui.QueueStatus("Kończenie poprzedniego wyszukiwania…");
+            await queueCancellation;await queueMutation.WaitAsync();
+            QueueTicket ticket;
+            try
+            {
+                while(true)
+                {
+                    if(generation!=queueGeneration)return;
+                    using var response=await directoryHttp.PostAsJsonAsync(url+"/queue",request,GameCatalog.Json);
+                    if(response.StatusCode==System.Net.HttpStatusCode.Conflict)
+                    {
+                        quickConflicts++;
+                        if(generation!=queueGeneration)return;
+                        ui.QueueStatus("Poprzedni wpis jest aktywny. Oczekiwanie na jego wygaśnięcie…");
+                        int delay=Math.Clamp((int)(response.Headers.RetryAfter?.Delta?.TotalSeconds??60),1,60);
+                        for(int second=0;second<delay&&generation==queueGeneration;second++)await Task.Delay(1000);
+                        continue;
+                    }
+                    response.EnsureSuccessStatusCode();
+                    ticket=await response.Content.ReadFromJsonAsync<QueueTicket>(GameCatalog.Json)??throw new InvalidDataException("Pusta odpowiedź katalogu.");
+                    if(generation!=queueGeneration){await DeleteTicket(url,ticket);return;}
+                    break;
+                }
+            }
+            finally{queueMutation.Release();}
+
             queuedBuild=request.Build with{SkillRanks=new(request.Build.SkillRanks,StringComparer.Ordinal)};
             queueTicket=ticket;autoStart=false;nextQueuePoll=now;ui.QueueStatus($"Szukanie rywali • fitness {ticket.Fitness:0}");
             GD.Print($"QUICK_QUEUED fitness={ticket.Fitness}");
@@ -47,12 +75,27 @@ public partial class Main
     private void CancelQuick()
     {
         queueGeneration++;queueBusy=false;queueAcknowledged=quickStartApproved=false;quickOffer=null;quickPeers.Clear();
-        var previous=queueTicket;queueTicket=null;queuedBuild=null;if(previous is not null)_=DeleteTicket(directoryAddress,previous);
+        var previous=queueTicket;queueTicket=null;queuedBuild=null;if(previous is not null)queueCancellation=CancelTicketAfter(queueCancellation,directoryAddress,previous);
     }
+    private async Task CancelTicketAfter(Task previous,string url,QueueTicket ticket)
+    {await previous;await queueMutation.WaitAsync();try{await DeleteTicket(url,ticket);}finally{queueMutation.Release();}}
     private async Task DeleteTicket(string url,QueueTicket ticket)
     {
-        try{using var request=new HttpRequestMessage(HttpMethod.Delete,$"{url}/queue/{ticket.Id}");request.Headers.Add("X-Queue-Secret",ticket.Secret);using var response=await directoryHttp.SendAsync(request);}
-        catch(Exception e) when(e is HttpRequestException or TaskCanceledException){}
+        var deadline=DateTimeOffset.UtcNow.AddSeconds(65);
+        do
+        {
+            int delay=1;
+            try
+            {
+                using var request=new HttpRequestMessage(HttpMethod.Delete,$"{url}/queue/{ticket.Id}");request.Headers.Add("X-Queue-Secret",ticket.Secret);
+                using var response=await directoryHttp.SendAsync(request);
+                if(response.IsSuccessStatusCode||response.StatusCode==System.Net.HttpStatusCode.NotFound)return;
+                delay=Math.Clamp((int)(response.Headers.RetryAfter?.Delta?.TotalSeconds??1),1,5);
+            }
+            catch(Exception e)when(e is HttpRequestException or TaskCanceledException){}
+            await Task.Delay(delay*1000);
+        }while(DateTimeOffset.UtcNow<deadline);
+        // No heartbeat is sent to a cancelled ticket; an unreachable directory expires it.
     }
     private async Task QueueAction(string action,QueueTicket ticket,Guid offer)
     {

@@ -4,6 +4,18 @@ namespace Game.Client;
 
 public partial class Main
 {
+    private int queueSmokeCycles;
+    private bool queueSmokeFinishing;
+    private async void RunQueueSmoke()
+    {
+        if(queueSmokeFinishing||queueTicket is null||queueBusy)return;
+        if(queueSmokeCycles++<4){StartQuick();return;}
+        queueSmokeFinishing=true;CancelQuick();long generation=lifecycle.Generation;await queueCancellation;
+        if(shuttingDown||!lifecycle.IsCurrent(generation))return;
+        bool expectConflict=arguments.ContainsKey("expect-queue-conflict");
+        if(expectConflict!=(quickConflicts>0)){GD.PushError("QUEUE_SMOKE: nie sprawdzono oczekiwanego konfliktu.");GetTree().Quit(5);return;}
+        GD.Print($"PASS: QUEUE_CLIENT_SMOKE four cancel/enqueue cycles, stale requests, conflicts={quickConflicts}.");GetTree().Quit();
+    }
     private int? inputSmokePad;
     private bool? inputSmokeFocus;
     private bool inputSmokeDone;

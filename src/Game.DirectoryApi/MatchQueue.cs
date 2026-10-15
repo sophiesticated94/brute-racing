@@ -33,8 +33,8 @@ public sealed class MatchQueue(GameCatalog catalog, TimeProvider time)
         lock(gate)
         {
             Sweep();
-            foreach(var old in entries.Values.Where(e=>e.Request.ClientId==request.ClientId).ToArray())Remove(old);
-            if(entries.Count>=1024)throw new InvalidOperationException("Kolejka pełna.");
+            if(entries.Values.Any(e=>e.Request.ClientId==request.ClientId))throw new QueueConflictException();
+            if(entries.Count>=1024)throw new QueueCapacityException();
             var ticket=new QueueTicket(Guid.NewGuid(),Convert.ToHexString(RandomNumberGenerator.GetBytes(24)),fitness);
             entries.Add(ticket.Id,new(ticket,request,ip.ToString(),time.GetUtcNow()));return ticket;
         }
@@ -110,3 +110,6 @@ public sealed class MatchQueue(GameCatalog catalog, TimeProvider time)
         }
     }
 }
+
+public sealed class QueueConflictException:Exception {public QueueConflictException():base("Aktywny ClientId. Anuluj wpis jego sekretem lub poczekaj na wygaśnięcie.") {}}
+public sealed class QueueCapacityException:Exception {public QueueCapacityException():base("Kolejka pełna.") {}}
