@@ -22,6 +22,16 @@ function Wait-Log([string]$name,[string]$pattern,[int]$seconds=120){
     }
     throw "Brak $pattern w $name. $testRoot"
 }
+function Read-LiveJson([string]$file){
+    for($attempt=0;$attempt -lt 20;$attempt++){
+        $reader=$null
+        try{
+            $stream=[IO.FileStream]::new($file,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+            $reader=[IO.StreamReader]::new($stream);return ($reader.ReadToEnd()|ConvertFrom-Json)
+        }catch [IO.IOException]{if($attempt -eq 19){throw};Start-Sleep -Milliseconds 20}
+        finally{if($reader){$reader.Dispose()}}
+    }
+}
 function Stop-Player($entry){if(!$entry.Process.HasExited){$entry.Process.Kill($true);$entry.Process.WaitForExit()}}
 function Copy-TestProfile([string]$source,[string]$target,[bool]$wrongToken){
     $candidate=[Game.Core.ProfileCodec]::Decode($script:catalog,[IO.File]::ReadAllText("$testRoot/$source.profile.json"))
@@ -40,7 +50,7 @@ try{
     $deadline=[DateTime]::UtcNow.AddSeconds(30)
     while(@(Select-String -Path "$testRoot/host1.engine.log" -Pattern 'RACE_START').Count -lt 2){if([DateTime]::UtcNow -gt $deadline){throw 'Nie rozpoczęto drugiej rundy.'};Start-Sleep -Milliseconds 100}
     $save=Get-ChildItem "$testRoot/campaigns/*.json"|Select-Object -First 1
-    $before=(Get-Content $save.FullName -Raw|ConvertFrom-Json).campaign
+    $before=(Read-LiveJson $save.FullName).campaign
     if($before.completedRounds -ne 1 -or @($before.participants|Where-Object {$_.ownedLevels.machine_gun -ge 2}).Count -lt 1){throw 'Nie utrwalono rundy i zakupów.'}
     Stop-Player $host1;Stop-Player $client1
     $host2=Start-Player 'host2' 'host' @("--resume-campaign=$($before.campaignId)",'--wait-players=2')
@@ -54,7 +64,7 @@ try{
     Copy-TestProfile 'client' 'wrong' $true
     $wrong=Start-Player 'wrong' 'wrong' @('--join=127.0.0.1')
     Wait-Log 'wrong' 'Nieprawidłowy lub zużyty' 20;Stop-Player $wrong
-    $afterAuth=(Get-Content $save.FullName -Raw|ConvertFrom-Json).campaign
+    $afterAuth=(Read-LiveJson $save.FullName).campaign
     if($afterAuth.revision -ne $before.revision){throw 'Nieautoryzowana próba zmieniła zapis.'}
     $client2=Start-Player 'client2' 'client' @('--join=127.0.0.1','--rounds=2')
     Wait-Log 'host2' 'CAMPAIGN_REJOIN' 25
@@ -72,7 +82,7 @@ try{
         if(!$report.success -or !$report.campaign.complete -or $report.profileRaces -ne 3 -or $report.profileCampaigns -ne 1){throw "Nieprawidłowe nagrody $($entry.Name). $testRoot"}
     }
     if($RewardCrash){
-        $pending=(Get-Content $save.FullName -Raw|ConvertFrom-Json).campaign
+        $pending=(Read-LiveJson $save.FullName).campaign
         if($pending.pendingRewards.Count -ne 2){throw 'Brak trwałych nagród nieobecnego gracza.'}
         $host3=Start-Player 'host3' 'host' @("--resume-campaign=$($before.campaignId)",'--wait-players=2')
         Wait-Log 'host3' 'CAMPAIGN_RESUMED' 25
@@ -80,8 +90,8 @@ try{
         Wait-Log 'host3' 'CAMPAIGN_REJOIN' 25
         $deadline=[DateTime]::UtcNow.AddSeconds(30)
         do{
-            $received=(Get-Content "$testRoot/client.profile.json" -Raw|ConvertFrom-Json).profile
-            $saved=(Get-Content $save.FullName -Raw|ConvertFrom-Json).campaign
+            $received=(Read-LiveJson "$testRoot/client.profile.json").profile
+            $saved=(Read-LiveJson $save.FullName).campaign
             if($received.completedRaces -eq 3 -and $received.completedCampaigns -eq 1 -and $saved.pendingRewards.Count -eq 0){break}
             if([DateTime]::UtcNow -gt $deadline){throw 'Nie dostarczono nagród po restarcie zakończonej kampanii.'};Start-Sleep -Milliseconds 200
         }while($true)
@@ -89,7 +99,7 @@ try{
         Stop-Player $host3;Stop-Player $client3
         foreach($entry in @($host3,$client3)){if($entry.Error.GetAwaiter().GetResult() -match 'ERROR:|Exception'){throw 'Błąd procesu dostarczania nagród.'}}
     }
-    $after=(Get-Content $save.FullName -Raw|ConvertFrom-Json).campaign
+    $after=(Read-LiveJson $save.FullName).campaign
     if($after.completedRounds -ne 3 -or @($after.rounds.raceId|Select-Object -Unique).Count -ne 3 -or $after.pendingRewards.Count -ne 0){throw 'Powtórzone rundy lub niepotwierdzone nagrody.'}
     foreach($member in $before.participants){if($member.participantId -notin $after.participants.participantId){throw 'Zmieniono trwałą tożsamość.'}}
     $firstPeer=(Select-String -Path "$testRoot/host1.engine.log" -Pattern 'PLAYER_JOINED id=(\d+)').Matches.Groups[1].Value

@@ -25,8 +25,7 @@ public partial class Main
             if (!isHost && id == 1)
             {
                 if(queueTicket is not null&&phase==RacePhase.Lobby){RetryQuick();return;}
-                bool finishedSmoke=smoke&&resultsWritten;DisconnectSession("Gospodarz zakończył połączenie.");
-                if (finishedSmoke||arguments.ContainsKey("exit-on-disconnect")) GetTree().Quit();
+                DisconnectSession("Gospodarz zakończył połączenie.");
                 return;
             }
             HandlePeerLost(id);
@@ -61,7 +60,7 @@ public partial class Main
                 case PacketKind.Control: HandleControl(sender, PacketCodec.DecodeJson<SessionMessage>(packet, PacketKind.Control)); break;
                 case PacketKind.Input:
                     if (!isHost || phase is RacePhase.Lobby or RacePhase.Podium || !racers.TryGetValue(sender, out var r) || r.Info.Bot) return;
-                    var inputs = PacketCodec.DecodeInputBatch(packet);if(inputs.RaceId!=raceId)return;
+                    var inputs = PacketCodec.DecodeInputBatch(packet,raceId);if(inputs.RaceId!=raceId)return;
                     // Redundancy recovers the latest state, never executes multiple physics steps or shots per packet.
                     foreach (var input in inputs.Commands) r.Gate.Accept(input, now);
                     break;
@@ -76,7 +75,7 @@ public partial class Main
         catch (Exception e) when (e is InvalidDataException or EndOfStreamException or JsonException or ArgumentException or NullReferenceException)
         {
             GD.Print($"REJECT_PACKET peer={sender} reason={e.GetType().Name}");
-            if (isHost) transport?.Disconnect(sender);
+            if (isHost) {transport?.Disconnect(sender);HandlePeerLost(sender);}
         }
     }
     private void RejectPeer(int peer,string reason)

@@ -284,7 +284,7 @@ public partial class Main : Node3D
             GD.PushError("SMOKE_TIMEOUT"); WriteResults(false); GetTree().Quit(2); return;
         }
         if (inSession && !isHost && now - lastServerPacket > 10) { if(queueTicket is not null&&phase==RacePhase.Lobby)RetryQuick();else DisconnectSession("Brak odpowiedzi gospodarza (10 s)."); return; }
-        if (isHost && phase == RacePhase.Lobby && autoStart && CampaignCanStart() && now >= autoStartAt && players.Values.Count(p => !p.Bot) >= expectedPlayers)
+        if (inSession && isHost && phase == RacePhase.Lobby && autoStart && CampaignCanStart() && now >= autoStartAt && players.Values.Count(p => !p.Bot) >= expectedPlayers)
         {
             foreach (var id in players.Keys.ToArray()) players[id] = players[id] with { Ready = true };
             TryStartRace();
@@ -363,7 +363,7 @@ public partial class Main : Node3D
     }
     private void FinishRace()
     {
-        finalRanking = Ranking(); pendingRaceFinalization=!AwardRace();if(pendingRaceFinalization)return; Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), false, 2);
+        finalRanking = Ranking(); pendingRaceFinalization=!AwardRace();if(pendingRaceFinalization)return;SyncSessionState(); Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), false, 2);
         // Final state is reliable, so the podium does not depend on the last unreliable snapshot.
         Send(0, PacketCodec.EncodeSnapshot(CreateSnapshot()), true, 0);
         SendControl(0, new("results", Ranking: finalRanking, RaceId: raceId)); nextRewardDelivery=0;TickCampaignPersistence(); ShowPodium();
@@ -379,12 +379,13 @@ public partial class Main : Node3D
     {
         lifecycle.Reset();gameplayInput.Reset();
         durableCampaign=null;campaignAuth.Clear();campaignIdentityReady.Clear();pendingCampaignHellos.Clear();pendingIdentity=null;pendingRaceFinalization=false;nextCampaignRetry=nextRewardDelivery=0;
-        transport?.Dispose(); transport = null; inSession = false; phase = RacePhase.Lobby;
+        transport?.Dispose(); transport = null; inSession = isHost = false; phase = RacePhase.Lobby;
+        completedRaces=0;roundRecorded=false;roundReports.Clear();resultsWritten=false;shakeTime=0;
         players.Clear(); seenEvents.Clear();eventCounts.Clear();aimLine=null;nextAimLine=0;
         lastSnapshotTick=0;localSequence=0;nextPing=0;
         players.Clear(); acceptedHello.Clear(); sentBuildProbes = false; campaign=null;campaignView=null;garage?.Close(); delayed.Clear(); finalRanking = []; if (raceRoot is not null) ClearRace();
     }
-    private void DisconnectSession(string message){Leave(message);lifecycle.Reset(SessionState.Disconnected);}
+    private void DisconnectSession(string message){bool quit=arguments.ContainsKey("exit-on-disconnect")||smoke&&resultsWritten;Leave(message);lifecycle.Reset(SessionState.Disconnected);if(quit)GetTree().Quit();}
     private void Leave(string message) { CancelQuick();SaveProfile(); LeaveInternal(); ui.ShowMenu();ui.SetCampaignSaves(campaignRepository?.List(profile.PlayerId).ToArray()??[]); ui.Notice(message, 7); GD.Print(message); }
     private void WriteResults(bool success)
     {

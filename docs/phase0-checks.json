@@ -1,0 +1,29 @@
+{
+  "xunit": {
+    "passed": 73,
+    "failed": 0,
+    "log": "artifacts/stages/phase0-final/tests.log"
+  },
+  "buildNetworkDisconnectEightCars": "artifacts/stages/phase0-final",
+  "eightProcessesTwoRounds": "artifacts/tests/b980ac07",
+  "campaignThreeRoundsImpairedCombat": "artifacts/tests/e5869555",
+  "resumeInterruptedRoundAndFinalRewardOutbox": "artifacts/tests/resume-89a1e699",
+  "dedicatedTwoRounds": "artifacts/tests/2b6cb160",
+  "directoryHttpLimits": "artifacts/tests/directory-12717aee",
+  "quickUnreachableHost": "artifacts/tests/quick-cc90f5e9",
+  "quickLostSecretAndCancel": "artifacts/tests/cancel-cbe061c9",
+  "nativeInputAndTwelveSessions": "artifacts/phase0-final-input.log",
+  "containerConfigurableLimits": "artifacts/phase0-container-test.log",
+  "windowsExport": "artifacts/phase0-windows-export.json",
+  "linuxExport": "artifacts/phase0-linux-export.json",
+  "render": "artifacts/phase0-render.json",
+  "ci": "deferred by user",
+  "quickStaleHttpResponses": "artifacts/tests/cancel-d0a6bc65",
+  "isolatedStageTests": {
+    "baseline": 48,
+    "input": 59,
+    "persistence": 67,
+    "queue": 70,
+    "final": 73
+  }
+}

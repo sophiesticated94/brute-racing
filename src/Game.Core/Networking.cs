@@ -75,12 +75,13 @@ public static class PacketCodec
         return stream.ToArray();
     }
     public static PlayerInputCommand[] DecodeInputs(byte[] bytes)=>DecodeInputBatch(bytes).Commands;
-    public static (uint RaceId,PlayerInputCommand[] Commands) DecodeInputBatch(byte[] bytes)
+    public static (uint RaceId,PlayerInputCommand[] Commands) DecodeInputBatch(byte[] bytes,uint? expectedRaceId=null)
     {
         using var r = Reader(bytes, PacketKind.Input);
         int count = r.ReadByte();
         if (count is < 1 or > 3 || bytes.Length != 6 + count * 25) throw new InvalidDataException("Input size.");
         uint raceId=r.ReadUInt32();
+        if(expectedRaceId is{} expected&&raceId!=expected)return(raceId,[]);
         var result = new PlayerInputCommand[count];
         for (var i = 0; i < count; i++)
         {

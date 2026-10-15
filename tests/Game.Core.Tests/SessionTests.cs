@@ -4,6 +4,13 @@ namespace Game.Core.Tests;
 public class SessionTests
 {
     [Fact]
+    public void FrozenTurretKeepsDirectionWithinTheWireAngleRange()
+    {
+        var gate=new GameplayInputGate();gate.Observe(SessionState.Racing,true,true,false,false);
+        var command=gate.Apply(new(1,1,0,0,0,0,false,false,false),MathF.Tau*3+1.1f);
+        Assert.True(command.IsValid);Assert.Equal(1.1f,command.AimYaw,4);
+    }
+    [Fact]
     public void ClosingUiClickBetweenTicksStillRequiresRelease()
     {
         var gate=new GameplayInputGate();gate.Observe(SessionState.Racing,false,true,false,false);

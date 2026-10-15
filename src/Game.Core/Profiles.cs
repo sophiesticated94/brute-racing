@@ -116,7 +116,14 @@ public sealed class ProfileRepository(GameCatalog catalog,string path)
     public PlayerProfile Load(out string warning)
     {
         warning="";
-        if(!File.Exists(path)) return new();
+        if(!File.Exists(path))
+        {
+            if(!File.Exists(path+".bak"))return new();
+            try{var backup=ProfileCodec.Decode(catalog,File.ReadAllText(path+".bak"));warning="Odzyskano profil z kopii zapasowej.";return backup;}
+            catch(NotSupportedException e){ReadOnly=true;warning=e.Message;return new();}
+            catch(Exception e)when(e is IOException or InvalidDataException or JsonException or ArgumentException or NullReferenceException)
+            {warning="Brak poprawnego zapisu profilu. Kopię zachowano osobno.";return new();}
+        }
         try{return ProfileCodec.Decode(catalog,File.ReadAllText(path));}
         catch(NotSupportedException e){ReadOnly=true;warning=e.Message;return new();}
         catch(Exception e) when(e is IOException or InvalidDataException or JsonException or ArgumentException or NullReferenceException)
@@ -126,6 +133,7 @@ public sealed class ProfileRepository(GameCatalog catalog,string path)
                 var backup=ProfileCodec.Decode(catalog,File.ReadAllText(path+".bak"));
                 File.Move(path,path+".corrupt-"+Guid.NewGuid().ToString("N"));warning="Odzyskano profil z kopii zapasowej.";return backup;
             }
+            catch(NotSupportedException future){ReadOnly=true;warning=future.Message;return new();}
             catch(Exception backupError) when(backupError is IOException or InvalidDataException or JsonException or ArgumentException or NotSupportedException or NullReferenceException)
             {
                 File.Move(path,path+".corrupt-"+Guid.NewGuid().ToString("N"));warning="Uszkodzony profil zachowano osobno. Utworzono nowy.";return new();

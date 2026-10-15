@@ -40,7 +40,7 @@ public sealed class GameplayInputGate
         if(!fireHeld)fireLatched=false;if(!mineHeld)mineLatched=false;
     }
     public PlayerInputCommand Apply(PlayerInputCommand command,float currentYaw)=>!CanRead
-        ? command with{Steering=0,Throttle=0,Brake=1,Handbrake=false,Fire=false,Mine=false,AimYaw=currentYaw}
+        ? command with{Steering=0,Throttle=0,Brake=1,Handbrake=false,Fire=false,Mine=false,AimYaw=MathF.IEEERemainder(currentYaw,MathF.Tau)}
         : command with{Fire=command.Fire&&!fireLatched,Mine=command.Mine&&!mineLatched};
     public void Block()=>CanRead=false;
     public void Reset(){CanRead=false;fireLatched=mineLatched=false;}

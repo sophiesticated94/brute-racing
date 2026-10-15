@@ -1,6 +1,6 @@
 # Mini Car Mayhem 3D
 
-[![Build and race](https://github.com/sophiesticated94/brute-racing/actions/workflows/ci.yml/badge.svg)](https://github.com/sophiesticated94/brute-racing/actions/workflows/ci.yml)
+CI pozostaje odłożone; bieżące wyniki lokalne są w [dokumentacji Fazy 0](docs/phase0-stability.md).
 
 Autorska wyścigowa gra bojowa: Godot **4.7 .NET**, **Jolt**, C#. Jeden tor 3D,
 samochód Rook w ośmiu kolorach, karabin, laser, rakiety, miny i do siedmiu rywali.
@@ -43,7 +43,9 @@ wymaga instalowania ICU na Linux.
 | Zrzut ekranu do danych użytkownika | F12 | — |
 
 Gaz i wsteczny są zależne od kierunku auta, kamera zachowuje orientację świata.
-Esc otwiera menu, ale **nie zatrzymuje wspólnej symulacji**. Ochrona po respawnie
+Esc otwiera menu, ale **nie zatrzymuje wspólnej symulacji**. UI i utrata fokusu
+blokują jazdę, celowanie i broń lokalnego gracza. Zamknięcie panelu wymaga
+zwolnienia LPM/PPM lub RB/LB przed kolejnym strzałem/miną. Ochrona po respawnie
 trwa 2 sekundy, uzupełnia się uzbrojenie. Laser regeneruje energię; przegrzany
 musi ostygnąć poniżej 30%. Karabin i rakiety mają ograniczoną amunicję.
 
@@ -63,11 +65,25 @@ z trzech slotów archiwum. Archiwum wybiera się do quick. Nowy profil zawiera
 trzy bazowe presety, więc można zacząć od razu. Kolory i kosmetyki nie zmieniają
 statystyk. Następna kampania ponownie resetuje rozwój, zachowując profil i archiwum.
 
+Host zapisuje każdą kampanię oddzielnie w `user://campaigns/<GUID>.json`.
+Menu **WZNÓW ZAPISANĄ KAMPANIĘ** otwiera ostatni zatwierdzony garaż; przerwana
+runda zaczyna się od początku i nie daje nagród. Powracający gracz używa tego
+samego profilu z tokenem kampanii. GUID lub nazwa bez tokenu nie wystarczają.
+Nieobecnych zastępują boty; miejsce można odzyskać przed startem rundy.
+Zakończoną kampanię również można otworzyć, aby odebrać oczekujące nagrody.
+Błąd zapisu blokuje następny start do skutecznego ponowienia zapisu.
+
+```powershell
+./scripts/run.ps1 -ResumeCampaign 'GUID-kampanii'
+# bezpośrednie CLI: --resume-campaign=<id>
+```
+
 Quick wymaga adresu uruchomionego katalogu HTTP(S). Katalog sam waliduje build
 i oblicza fitness według wag JSON. Szuka do 8 ludzi, celuje w 4; od 2 może zacząć
 po 15 sekundach. Tolerancja rośnie z 10% co 10 s do 25%. Quick nie dodaje botów.
 Przed startem wszyscy potwierdzają rzeczywiste połączenie ENet z wybranym hostem;
-nieudana oferta wraca do kolejki. Przycisk anulowania usuwa wpis.
+nieudana oferta wraca do kolejki. Przycisk anulowania usuwa wpis przed kolejnym wyszukiwaniem. Po restarcie
+bez sekretu biletu klient czeka na jego wygaśnięcie (do 60 s).
 
 ```powershell
 ./scripts/run.ps1 -Solo -Mode Campaign -CampaignRaces 6
@@ -81,7 +97,9 @@ lokalnie lub w kontenerze. Instrukcja: [docs/directory.md](docs/directory.md).
 Kampania i bezpośrednie IP działają bez niego. Dotychczasowe flagi i `-Solo`
 bez `-Mode` zachowują pojedynczy wyścig / `--rounds` rewanżów.
 
-Profil `user://profile.json` ma wersję, sumę SHA-256, zapis atomowy i `.bak`.
+Profil `user://profile.json` w schemacie 2 zawiera także poufne tokeny powrotu.
+Migracja schematu 1 najpierw weryfikuje jego oryginalną sumę i zachowuje zdobycze.
+Profil ma wersję, sumę SHA-256, zapis atomowy i `.bak`.
 Uszkodzony plik zostaje zachowany, a gra próbuje odzyskać kopię. Nieznana nowsza
 wersja nie jest nadpisywana. `--smoke` używa pamięci; jawne `--profile-path=...`
 pozwala sprawdzić izolowany zapis. Host weryfikuje poprawność i siłę archiwum,
@@ -117,6 +135,9 @@ hosta bez lokalnego kierowcy służą argumenty silnika `-- --host --dedicated -
 ./scripts/integration.ps1 -Dedicated -Rounds 2 -Port 29848
 ./scripts/connection-tests.ps1
 ./scripts/integration.ps1 -Campaign -Impaired -Combat -Port 29860
+./scripts/campaign-resume-tests.ps1 -RewardCrash
+./scripts/directory-security-tests.ps1
+./scripts/quick-cancel-tests.ps1 -Orphan
 ./scripts/quick-integration.ps1 -UnreachableHost
 ./scripts/quick-integration.ps1 -Players 4 -DirectoryPort 5088 -GamePort 29930
 ./scripts/setup.ps1 -ExportTemplates  # pobiera ok. 1,2 GB
@@ -152,7 +173,7 @@ Diagnostyka: `--timeout=210`, `--no-weapons`, `--weapon=laser`, `--rounds=2`,
 - `data`: źródłowe JSON-y kopiowane do projektu podczas budowania.
 - `src/Game.DirectoryApi`: opcjonalny katalog ASP.NET Core 10, kolejka i oferty w pamięci.
 - `tests/Game.Core.Tests`: testy xUnit. `.github/workflows/ci.yml`: build, testy,
-  wyścigi procesów i eksporty.
+  wyścigi procesów i eksporty; CI jest obecnie odłożone.
 
 Opis obecnego kodu: [architektura](docs/architecture.md),
 [sieć](docs/networking-p2p.md), [wyniki i granice weryfikacji](docs/verification.md).

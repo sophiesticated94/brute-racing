@@ -38,7 +38,11 @@ a potem boty kupują rozwój zgodnie z wybraną specjalizacją.
 
 ## Sesja i walka
 
-`Main` składa scenę i stany Lobby → Countdown → Racing → Podium. Części klasy
+`Main` składa scenę. `SessionLifecycle` jawnie śledzi Menu, Lobby, Countdown,
+Racing, Podium, Intermission, CampaignComplete i Disconnected. Dotychczasowy
+RacePhase pozostaje bez zmian dla zegara/snapshotów. GameplayInputGate działa
+przed odczytem źródła i przed zastosowaniem komendy, z blokadą do zwolnienia
+przycisków. Otwarcie panelu i utrata fokusu blokują także kliknięcia między tickami. Części klasy
 wydzielają sieć, walkę, mechaniki, wejście, celowanie, prezentację, walidację,
 progresję i quick. Ten sam kod obsługuje solo, listen host i serwer headless.
 Pierwsza meta uruchamia limit 30 s; pełny finisz kończy rundę wcześniej.
@@ -59,6 +63,16 @@ a nie dowód własności. Ekonomia pochodzi z JSON: pierwszy zakup po pierwszej
 rundzie; XP skaluje się z długością kampanii. Nowa kampania tworzy nowy GUID i
 resetuje wszystkie parametry mechaniczne. Rozłączonego gracza przejmuje bot.
 
+`CampaignState.Participants` jest indeksowany trwałymi GUID. Mapa int → GUID jest
+adapterem bieżących PeerId i botów, nie trafia do zapisu. CampaignSnapshot ma
+schemat 1, revision, hash reguł/danych, rozwój, własność, rundy, identyfikatory
+operacji, poufne tokeny i trwałą kolejkę nagród. CampaignRepository zapisuje osobne
+pliki przez flush i atomowe zastąpienie z `.bak`. DurableCampaign publikuje kopię
+stanu dopiero po zapisie. Nieudany wynik pozostaje oczekujący na retry; nieudany
+zakup nie zmienia zatwierdzonego stanu. Main.Persistence łączy te kontrakty z UI,
+autoryzacją powrotu i dostarczaniem nagród. Przy wznowieniu odtwarza garaż,
+nie stan fizyki przerwanej rundy.
+
 `PlayerProfile` oddziela monety i kosmetyki od rozwoju kampanii. Ma trzy sloty
 archiwum oraz oczekujący końcowy build do świadomego zapisania w slocie. `ProfileRules`
 deduplikuje nagrody według GUID wyścigu/kampanii. `ProfileRepository` zapisuje
@@ -75,3 +89,12 @@ Katalog wybiera kandydata na hosta; Godot zestawia prawdziwy ENet i wszyscy
 potwierdzają gotowość oferty, zanim host dostanie zgodę na start. Błędy odnoszą
 się do GUID oferty, więc stara odpowiedź nie anuluje kolejnej próby.
 Nie ma bazy, kont, relaya ani domyślnego publicznego wdrożenia.
+
+Schemat profilu 2 dodaje słownik tokenów kampanii. Dekoder v1 używa oryginalnego
+kontraktu do weryfikacji SHA-256 przed migracją. Nagroda jest stosowana na kopii
+profilu i potwierdzana hostowi dopiero po zapisie. Smoke domyślnie nie otwiera
+repozytoriów profilu/kampanii; testy trwałości podają izolowane ścieżki.
+
+Directory API nie zastępuje aktywnego ClientId bez sekretu: zwraca 409. Middleware
+ogranicza IP kubełkami tokenów, body do 32 KiB i JSON do 16 poziomów przed
+modyfikacją kolejki. Limity oraz wyjątki pojemności są opisane w directory.md.

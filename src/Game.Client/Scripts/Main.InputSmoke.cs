@@ -5,9 +5,10 @@ namespace Game.Client;
 public partial class Main
 {
     private int queueSmokeCycles;
-    private bool queueSmokeFinishing;
+    private bool queueSmokeFinishing,queueSmokeCollided;
     private async void RunQueueSmoke()
     {
+        if(!queueSmokeCollided){queueSmokeCollided=true;StartQuick();StartQuick();return;}
         if(queueSmokeFinishing||queueTicket is null||queueBusy)return;
         if(queueSmokeCycles++<4){StartQuick();return;}
         queueSmokeFinishing=true;CancelQuick();long generation=lifecycle.Generation;await queueCancellation;
@@ -31,7 +32,7 @@ public partial class Main
             GD.Print("PASS: INPUT_SESSION_SMOKE mouse/pad, garage/dialog/pause/focus, release latch, 12 sessions and stale timers.");GetTree().Quit();return;
         }
         inputSmokeDone=true;Input.UseAccumulatedInput=false;inputSmokeFocus=true;autoPlay=false;phase=RacePhase.Racing;SyncSessionState();
-        var racer=racers[localId];racer.Car.TurretYaw=1.1f;
+        var racer=racers[localId];racer.Car.TurretYaw=MathF.Tau*3+1.1f;
         static void Check(bool valid,string detail){if(!valid)throw new InvalidOperationException("INPUT_SMOKE: "+detail);}
         void Buttons(bool down,bool pad)
         {
@@ -58,7 +59,7 @@ public partial class Main
             foreach(var panel in panels)
             {
                 float previousAim=desiredAim;panel.Open();var blocked=LocalCommand(racer,sequence++);
-                Check(blocked.Throttle==0&&blocked.Steering==0&&blocked.Brake==1&&!blocked.Handbrake&&!blocked.Fire&&!blocked.Mine&&blocked.AimYaw==racer.Car.TurretYaw&&desiredAim==previousAim,panel.Name+" blocked "+pad);
+                Check(blocked.Throttle==0&&blocked.Steering==0&&blocked.Brake==1&&!blocked.Handbrake&&!blocked.Fire&&!blocked.Mine&&Mathf.Abs(Mathf.Wrap(blocked.AimYaw-racer.Car.TurretYaw,-Mathf.Pi,Mathf.Pi))<.00001f&&blocked.IsValid&&desiredAim==previousAim,panel.Name+" blocked "+pad);
                 panel.Close();var held=LocalCommand(racer,sequence++);Check(!held.Fire&&!held.Mine,panel.Name+" held "+pad);
                 Buttons(false,pad);LocalCommand(racer,sequence++);Buttons(true,pad);
                 var released=LocalCommand(racer,sequence++);Check(released.Fire&&released.Mine,panel.Name+" release "+pad);
@@ -74,7 +75,7 @@ public partial class Main
         {
             ScheduleSession(.05,()=>staleSmokeCallbacks++);
             seenEvents.Add(999);recentInputs.Enqueue(new(1,1,0,0,0,0,false,false,false));effects.AddChild(new Node3D());
-            LeaveInternal();Check(racers.Count==0&&pending.Count==0&&seenEvents.Count==0&&recentInputs.Count==0&&ordnance.Count==0&&effects.GetChildCount()==0&&!garage.IsBlockingInput,"cleanup");
+            LeaveInternal();Check(!inSession&&!isHost&&racers.Count==0&&pending.Count==0&&seenEvents.Count==0&&recentInputs.Count==0&&ordnance.Count==0&&effects.GetChildCount()==0&&!garage.IsBlockingInput,"cleanup");
             StartSolo();
         }
         phase=RacePhase.Racing;SyncSessionState();gameMode=GameMode.Campaign;EnsureCampaign();

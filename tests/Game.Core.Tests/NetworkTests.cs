@@ -10,6 +10,13 @@ public class NetworkTests
         1.4f, 80, 45, 20, 12, 5, 1, 3, 15, 0, 1, 101, -1);
 
     [Fact]
+    public void PriorRaceInputIsIgnoredBeforeDecodingItsCommands()
+    {
+        var stale=PacketCodec.EncodeInputs([Command() with{AimYaw=9}],1);
+        Assert.Empty(PacketCodec.DecodeInputBatch(stale,2).Commands);
+        Assert.Throws<InvalidDataException>(()=>PacketCodec.DecodeInputBatch(stale,1));
+    }
+    [Fact]
     public void InputBatchKeepsRaceEpochAndSafeDiagnosticText()
     {
         var batch=PacketCodec.DecodeInputBatch(PacketCodec.EncodeInputs([Command()],88));

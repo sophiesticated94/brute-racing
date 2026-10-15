@@ -84,7 +84,7 @@ public sealed class CampaignRepository(GameCatalog catalog,string directory)
         catch(Exception e)when(e is IOException or JsonException or InvalidDataException or ArgumentException or NullReferenceException)
         {
             var backup=CampaignSnapshotCodec.Decode(catalog,File.ReadAllText(file+".bak"));
-            if(File.Exists(file))File.Copy(file,file+".corrupt-"+Guid.NewGuid().ToString("N"));warning="Odzyskano kampanię z kopii zapasowej.";return backup;
+            if(File.Exists(file))File.Move(file,file+".corrupt-"+Guid.NewGuid().ToString("N"));warning="Odzyskano kampanię z kopii zapasowej.";return backup;
         }
     }
     public IEnumerable<(Guid Id,string Label)> List(Guid owner)

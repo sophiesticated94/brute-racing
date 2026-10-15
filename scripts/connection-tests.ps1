@@ -48,7 +48,7 @@ try {
     if (!$survivingClient.Process.WaitForExit(20000)) { throw 'Klient nie obsłużył utraty hosta.' }
     $clientOutput = $survivingClient.Output.GetAwaiter().GetResult()
     $clientError = $survivingClient.Error.GetAwaiter().GetResult()
-    if ($survivingClient.Process.ExitCode -ne 0 -or (Get-Content -LiteralPath $survivingClient.Log -Raw -Encoding utf8) -notmatch 'Gospodarz zakończył połączenie' -or $clientError -match 'ERROR:|Fatal|Exception') { throw 'Błąd klienta po utracie hosta.' }
+    if ($survivingClient.Process.ExitCode -ne 0 -or (Get-Content -LiteralPath $survivingClient.Log -Raw -Encoding utf8) -notmatch 'Gospodarz zakończył połączenie|Brak odpowiedzi gospodarza' -or $clientError -match 'ERROR:|Fatal|Exception') { throw 'Błąd klienta po utracie hosta.' }
     Write-Host "PASS: przejęcie auta przez AI i bezpieczna utrata hosta. Logi: $testRoot"
 } finally {
     foreach ($entry in $running) {

@@ -18,8 +18,8 @@ mieści się w 1200 bajtach. Dekodery ograniczają długość, liczebność i za
 Pętla używa małych buforów i list o ograniczonej historii; obecny kodek nadal
 alokuje pakiety i nie jest implementacją całkowicie bez alokacji.
 
-Handshake **wersji 3** zawiera wersję protokołu, SHA-256 zestawu plików JSON bez różnic formatowania
-danych, nazwę, kolor i deklarację buildu. Host sprawdza build i sam liczy statystyki.
+Handshake **wersji 4** zawiera wersję protokołu, SHA-256 zestawu plików JSON bez różnic formatowania
+danych, nazwę, kolor, deklarację buildu i GUID profilu. Host sprawdza build i sam liczy statystyki.
 Nie przyjmuje od klienta pozycji, obrażeń, okrążeń ani wyników. Peer wejścia jest
 ustalany przez transport. Duplikaty i stare sekwencje są odrzucane; utrata wejścia
 na ponad 150 ms neutralizuje gaz i ogień. Nadmiar komend nie dodaje kroków fizyki.
@@ -38,7 +38,9 @@ To nie jest deterministyczny rollback całego Jolta. Kolizje z innymi autami
 i wybuchy mogą wymagać widocznej korekty. Auta zdalne odtwarzają snapshoty
 z buforem 100 ms; historia jest ograniczona. Nie synchronizujemy drzewa scen.
 
-Każdy wyścig ma osobny RaceId w starcie, snapshotach i zdarzeniach. Opóźnione
+Każdy wyścig ma osobny RaceId w starcie, wejściu, snapshotach i zdarzeniach.
+Wejście v4: typ byte, liczba komend byte, RaceId uint32, następnie komendy po
+25 bajtów. Host ignoruje paczki wejścia poprzedniej rundy przed walidacją sekwencji. Opóźnione
 pakiety poprzedniej rundy nie mogą nadpisać rewanżu. Zdarzenia mają monotoniczny
 EventId i są deduplikowane. Końcowy snapshot jest niezawodny i poprzedza podium.
 
@@ -72,3 +74,25 @@ Błąd zawiera identyfikator konkretnej oferty. Katalog nie tuneluje UDP.
 
 Testowe opóźnienie i strata pakietów są iniekcją w transport gry. Nie symulują
 awarii routera ani utraty niezawodnych datagramów ENet na poziomie systemu.
+
+## Trwała tożsamość kampanii (v4)
+
+PeerId identyfikuje tylko połączenie. Host wiąże go z ParticipantId po sprawdzeniu
+profilu i jednorazowego wyzwania. Nowy uczestnik otrzymuje token bezpośrednim
+`campaign_welcome`; klient zapisuje profil przed `campaign_identity_ack`.
+Powrót: `campaign_challenge` → HMAC-SHA256 tokenem nad
+`campaignGuid|participantGuid|profileGuid|nonce` → `campaign_proof`.
+Wyzwanie jest przypisane do połączenia i zużywane także przy błędnym dowodzie.
+Aktywnego miejsca nie można przejąć drugim połączeniem. Lobby i raporty zawierają
+publiczny CampaignView, nigdy CampaignSnapshot ani tokeny. ENet sam nie szyfruje
+transportu; prywatny token początkowy nie jest rozgłaszany pozostałym graczom.
+
+Zakupy/rangi/wyposażenie mają RequestId. Potwierdzenie z revision wychodzi po
+zatwierdzeniu zapisu. Wynik zapisuje jednocześnie rozwój i kolejkę nagród.
+`reward_ack` wychodzi po atomowym zapisie profilu, a host utrwala usunięcie nagrody
+z kolejki. Ponowne dostarczenie korzysta z GUID nagrody, również po restarcie.
+
+Generacja sesji chroni callbacki transportu, timery i wynik UPnP. Quick ma osobną
+generację operacji HTTP i szereguje anulowanie/enqueue; stare odpowiedzi nie
+zmieniają nowego wyszukiwania. Host przejmuje auto po 10 s bez pakietu, niezależnie
+od natywnego timeoutu ENet. Powtórne rozłączenie nie powiela przejęcia.

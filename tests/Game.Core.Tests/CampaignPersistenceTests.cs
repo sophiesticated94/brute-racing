@@ -59,6 +59,9 @@ public class CampaignPersistenceTests
             var repo=new CampaignRepository(catalog,folder);var state=Campaign(catalog);repo.Save(state.Capture());Finish(state,Guid.NewGuid());repo.Save(state.Capture());
             File.WriteAllText(Path.Combine(folder,state.Id+".json"),"broken");var recovered=repo.Load(state.Id,out string warning);
             Assert.Contains("kopii",warning);Assert.Equal(0,recovered.CompletedRounds);Assert.Single(Directory.GetFiles(folder,"*.corrupt-*"));
+            // A successful save after recovery must not replace the good backup with corrupt bytes.
+            repo.Save(recovered with{Revision=1});File.WriteAllText(Path.Combine(folder,state.Id+".json"),"broken again");
+            Assert.Equal(0,repo.Load(state.Id,out _).CompletedRounds);
             Assert.Throws<NotSupportedException>(()=>CampaignSnapshotCodec.Validate(catalog,recovered with{RulesetHash="other"}));
             Assert.Throws<NotSupportedException>(()=>CampaignSnapshotCodec.Validate(catalog,recovered with{SchemaVersion=99}));
         }
@@ -90,6 +93,20 @@ public class CampaignPersistenceTests
         profile=ProfileCodec.Decode(catalog,savedProfile);Assert.False(ProfileRules.ApplyReward(catalog,profile,receipt));Assert.Equal(1,profile.CompletedRaces);
         Assert.True(restarted.Commit(Guid.NewGuid(),s=>s.Acknowledge(1001,receipt.Id)));
         var again=CampaignState.Restore(catalog,disk!);Assert.DoesNotContain(again.PendingRewards,r=>r.ParticipantId==participant);
+    }
+    [Fact]
+    public void ProfileRecoverySurvivesAnotherRestartBeforeTheNextSave()
+    {
+        var catalog=DomainTests.Catalog();string folder=Path.Combine(Path.GetTempPath(),"brute-profile-"+Guid.NewGuid());string path=Path.Combine(folder,"profile.json");
+        try
+        {
+            var repo=new ProfileRepository(catalog,path);var profile=new PlayerProfile{Coins=60};Guid identity=profile.PlayerId;
+            repo.Save(profile);repo.Save(profile);File.WriteAllText(path,"corrupt");
+            Assert.Equal(identity,repo.Load(out _).PlayerId);Assert.False(File.Exists(path));
+            var restarted=new ProfileRepository(catalog,path);var recovered=restarted.Load(out string warning);
+            Assert.Equal(identity,recovered.PlayerId);Assert.Equal(60,recovered.Coins);Assert.Contains("kopii",warning);
+        }
+        finally{if(Directory.Exists(folder))Directory.Delete(folder,true);}
     }
     [Fact]
     public void MigrationChecksTheOriginalV1ChecksumBeforeAddingCredentials()
